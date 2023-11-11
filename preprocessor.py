@@ -33,6 +33,7 @@ def preprocesser(raw_df, preproc_params, new=True, interest_rates=True):
         df = pd.merge_asof(df.sort_values("stmt_date"), interest_rates.sort_values("offset_date"), 
                            left_on='stmt_date', right_on='offset_date', direction='nearest')
 
+    
     # Convert Legal Structure & ATECO Code to categorical fields 
     df['legal_struct'] = pd.Categorical(df['legal_struct'])
     df['legal_struct'] = df['legal_struct'].cat.codes
@@ -54,8 +55,7 @@ def preprocesser(raw_df, preproc_params, new=True, interest_rates=True):
     df['quick_ratio'] = df['cash_and_equiv'] / (df['current_liabilities'])
     
     # Defensive interval (liquidity ratio) = liquid assets / daily cash burn
-    df['defensive_interval'] = (df['cash_and_equiv'] + df['AR'])\
-        .apply(lambda x: x if x > 0 else np.nan) / ( df['operating_expenses'] / 365)
+    df['defensive_interval'] = (df['cash_and_equiv'] + df['AR']) / ( df['operating_expenses'] / 365)
 
     ################################# Asset Management Ratios ######################################
     
@@ -77,7 +77,8 @@ def preprocesser(raw_df, preproc_params, new=True, interest_rates=True):
         .apply(lambda x: x if x != 0 else 1) # Smoothing factor if debt = 0
     
     # CFO to operating earnings ratio = Cash flow from operations / operating_profit
-    df['cfo_to_op_earnings'] = df['cf_operations'] / df['prof_operations']
+    df['cfo_to_op_earnings'] = df['cf_operations'] / df['prof_operations']\
+        .apply(lambda x: x if x != 0 else 1) # Smoothing factor if prof_operations = 0
     
     # Leverage ratio = total liabilities / total assets
     df['leverage_ratio'] = (df['asst_tot'] - df['eqty_tot']) / df['asst_tot']
@@ -95,6 +96,9 @@ def preprocesser(raw_df, preproc_params, new=True, interest_rates=True):
             date_range[date] = (prediction_window_start, prediction_window_end)
         df['Default'] = df.apply(lambda x: default_check(x, date_range), axis=1)
 
+    # Drop df columns not being used (for sklearn classifiers)
+    #processed_df = df.drop(columns=[col for col in df.columns if col not in preproc_params['features']])
+    
     return df
     
 
@@ -108,6 +112,7 @@ def main():
     preproc_params = {
         "statement_offset" : 6,
         "ir_path": r"C:\Users\Andrew Deur\Documents\NYU\DS-GA 3001 ML in Finance Discrete Choice\3001-ML-Finance-Project\ECB Data Portal_20231029154614.csv",
+        "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'AR']
     }
 
     df_processed = preprocesser(df, preproc_params, new=True, interest_rates=True)
