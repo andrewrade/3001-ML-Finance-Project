@@ -1,11 +1,26 @@
+import json
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter
 import seaborn as sns
 import scipy.stats as st
-import json
+import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 from scipy.optimize import curve_fit
+
+def bayesian_pd_adjustment(pd_i, pd_sample, pd_true):
+    '''
+        Calibrate model output probabilities to reflect the ground truth population PD. 
+        Adjustment factor computed via the Bayesian Method
+    Parameters:
+        pd_i: model probability output to be adjusted
+        pd_sample: the sample population PD estimated by the model
+        pd_true: the true population PD
+    Returns:
+        adj_pd_i: adjusted model probability
+    '''
+    adj_pd_i = pd_true * ((pd_i * (1-pd_sample)) / (pd_sample - pd_i * pd_sample + pd_i*pd_true - pd_sample*pd_true))
+    return adj_pd_i
+
 
 def bootstrap_population_pd(df, n_samples=10000):
     '''
@@ -14,7 +29,7 @@ def bootstrap_population_pd(df, n_samples=10000):
     Parameters:
         df: Dataframe with columns 'fs_year' and 'Default' (binary class label)
         n_samples: Int, number of bootstrapped samples to produce 
-        confidence: float, confidence level to use for interval (default is 95%)
+        confidence: float, confidence level to use for interval (default is 99%)
     Returns:
         bootstrap_pd_stats: dictionary with results from bootstrapping
             mean: mean PD (%)
@@ -39,13 +54,13 @@ def bootstrap_population_pd(df, n_samples=10000):
         bootstrapped_results[i, :] = bootstrapped_samples
 
     # Sum results from each year & divide by total num records to get overall PDs
-    agg_boostrapped_results = np.sum(bootstrapped_results, axis=0) / n_records
+    agg_bootstrapped_results = np.sum(bootstrapped_results, axis=0) / n_records
 
     # PD bootstrap statistics 
-    mean_pd = np.mean(agg_boostrapped_results)
-    std_pd = np.std(agg_boostrapped_results, ddof=1)
+    mean_pd = np.mean(agg_bootstrapped_results)
+    std_pd = np.std(agg_bootstrapped_results, ddof=1)
     std_error_pd = std_pd / np.sqrt(n_records)
-    ci = st.norm.interval(alpha=0.95, loc=mean_pd, scale=std_error_pd)
+    ci = st.norm.interval(alpha=0.99, loc=mean_pd, scale=std_error_pd)
 
     print(f'mean default:{mean_pd:.2%}')
     print(f'default std:{std_pd:.2%}')
@@ -57,7 +72,7 @@ def bootstrap_population_pd(df, n_samples=10000):
         '99%_ci': ci
     }
     
-    return agg_boostrapped_results, bootstrapped_pd_stats
+    return agg_bootstrapped_results, bootstrapped_pd_stats
 
 
 def non_parametric_pd_calibration(y_true, preds):
