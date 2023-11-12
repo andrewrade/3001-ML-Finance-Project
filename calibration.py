@@ -67,6 +67,9 @@ def non_parametric_pd_calibration(y_true, preds):
         y_true: n x 1 array of ground truth labels
         preds: n x 1 array of PDs produced by the model 
     Returns:
+        calibration_curve_params: Parameters a,b,c of the fit curve a*exp(-b*x) + c
+        bin_centers: discrete model PDs X used to fit calibration curve
+        bin_pds: discrete true PDs y used to fit calibration curve
         
     '''
     def optimal_num_bins(data):
