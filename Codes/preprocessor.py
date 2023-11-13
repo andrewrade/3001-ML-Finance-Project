@@ -79,7 +79,6 @@ def label_defaults(df, preproc_params):
         1: Defaulted within 12 months from statement date + offset
         0: Did not default within 12 months
     '''
-
     df['def_date'] = pd.to_datetime(df['def_date'], format="%d/%m/%Y")
     
     date_range = dict()
@@ -99,12 +98,12 @@ def financial_ratios(df, preproc_params):
     features = preproc_params['features']
 
     # OpEX required to calculate defensive interval 
-    if 'operating_expenses' or 'defensive_interval' in features:
+    if 'operating_expenses' in features or 'defensive_interval' in features:
         df['operating_expenses'] = (df['rev_operating'] - df['prof_operations']) \
        .apply(lambda x: x if x > 0 else np.nan) # Operating expenses shouldn't be negative, set negative values to Nan
 
     # Current liabilities required to calculate Current and Quick ratios
-    if 'current_liabilities' or 'current_ratio' or 'quick_ratio' in features:
+    if 'current_liabilities' in features or 'current_ratio' in features or 'quick_ratio' in features:
         df['current_liabilities'] = (df['debt_bank_st'] + df['debt_fin_st'] + df['AP_st'] + df['debt_st'])
         df['current_liabilities'] = df['current_liabilities'].replace(0, 1) # Smoothing factor if current_liabilities = 0 
 
@@ -211,9 +210,7 @@ def main():
 
     df_processed = preprocessing_func(df, preproc_params, label=True, interest_rates=True)
     print(f"Number of records:{len(df_processed):,}")
-    
     df_processed.to_csv("train_processed_test.csv")
-
 
 
 if __name__ == "__main__":
