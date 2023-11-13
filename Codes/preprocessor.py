@@ -52,9 +52,6 @@ def consolidate_ateco_codes(df):
           }
     
     df['ateco_industry'] = df['ateco_sector'].map(atc_cd)
-    df['ateco_industry'] = pd.Categorical(df['ateco_industry'])
-    df['ateco_industry'] = df['ateco_industry'].cat.codes
-    
     return df
 
 def merge_interest_rates(df, preproc_params):
@@ -156,6 +153,32 @@ def financial_ratios(df, preproc_params):
     
     return df
 
+def categorical_to_csv(df):
+    '''
+        Save mapping of categorical variables to encoded values to csv
+    '''
+    # Consolidate ateco sectors into industry groups
+    df = consolidate_ateco_codes(df)
+    df['ateco_industry'] = pd.Categorical(df['ateco_industry'])
+    df['legal_struct'] = pd.Categorical(df['legal_struct'])
+
+    ateco_industry_mapping = pd.DataFrame({
+            'Original_Value': df['ateco_industry'],
+            'Code': df['ateco_industry'].cat.codes
+    })
+
+    legal_struct_mapping = pd.DataFrame({
+            'Original_Value': df['legal_struct'],
+            'Code': df['legal_struct'].cat.codes
+    })
+
+    ateco_industry_mapping = ateco_industry_mapping.drop_duplicates()
+    legal_struct_mapping = legal_struct_mapping.drop_duplicates()
+
+    # Save the mappings to CSV
+    legal_struct_mapping.to_csv('legal_struct_mapping.csv', index=False)
+    ateco_industry_mapping.to_csv('ateco_sector_mapping.csv', index=False)
+
 
 def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=True):
     '''
@@ -165,7 +188,7 @@ def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=T
             "statement_offset": (int) months offset to use for financial statement availability
             "ir_path": (str) path to the historical ECB interest rate csv
             "features": (list of strings) features to retain in the processed dataframe
-        label: Boolean, if True add class labels
+        label: Boolean, True if add class labels
         interest_rates: Boolean, if True merge historical ECB interest rate data into df
     Returns:
         Processed dataframe for model training/inference
@@ -181,13 +204,19 @@ def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=T
     df = raw_df.copy()    
     df['stmt_date'] = pd.to_datetime(df['stmt_date'], format="%Y-%m-%d")
 
-    # Convert Legal Structure & ATECO Code to categorical fields 
-    df['legal_struct'] = pd.Categorical(df['legal_struct'])
-    df['legal_struct'] = df['legal_struct'].cat.codes
-    df['ateco_sector'] = pd.Categorical(df['ateco_sector'])
+    try:
+        legal_struct_mapping = pd.read_csv('legal_struct_mapping.csv')
+        ateco_industry_mapping = pd.read_csv('ateco_sector_mapping.csv')
+    except:
+        categorical_to_csv(df)
+        legal_struct_mapping = pd.read_csv('legal_struct_mapping.csv')
+        ateco_industry_mapping = pd.read_csv('ateco_sector_mapping.csv')
 
-    # Consolidate ateco sectors into industry groups
-    df = consolidate_ateco_codes(df)
+    # Map and encode 'legal_struct'
+    df['legal_struct'] = df['legal_struct'].map(dict(zip(legal_struct_mapping['Original_Value'], legal_struct_mapping['Code'])))
+    # Map and encode 'ateco_sector'
+    df['ateco_sector'] = df['ateco_sector'].map(dict(zip(ateco_industry_mapping['Original_Value'], ateco_industry_mapping['Code'])))
+
     # Compute any of the financial ratios passed into preproc_params['features]
     df = financial_ratios(df, preproc_params)
     
@@ -217,7 +246,7 @@ def main():
     df = pd.read_csv("train.csv")
     print(f"Number of records:{len(df):,}")
     print("Preprocessing")
-    df_processed = preprocessing_func(df)
+    df_processed = preprocessing_func(df, label=True, interest_rates=True)
     print(f"Number of records:{len(df_processed):,}")
     df_processed.to_csv("train_processed_test.csv")
 
