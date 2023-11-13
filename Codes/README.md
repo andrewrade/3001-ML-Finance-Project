@@ -30,3 +30,6 @@
 # Code Run
 
 ## train_harness.py to train and generate ROC auc curve
+
+
+## Final Harness -  python harness.py --input_csv '/Users/chitvangoyal/Desktop/3001_project/3001-ML-Finance-Project/train.csv' --output_csv 'pred.csv'
