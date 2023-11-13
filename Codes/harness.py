@@ -24,7 +24,7 @@ model_type='Logit'
 
 preproc_params = {
     "statement_offset" : 6,
-    "ir_path": r"/Users/chitvangoyal/Desktop/3001_project/3001-ML-Finance-Project/ECB Data Portal_20231029154614.csv",
+    "ir_path": "ECB Data Portal_20231029154614.csv",
     "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'AR', 'stmt_date', 'id']
 }
 
