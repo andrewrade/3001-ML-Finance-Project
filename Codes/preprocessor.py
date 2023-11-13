@@ -54,6 +54,7 @@ def consolidate_ateco_codes(df):
     df['ateco_industry'] = df['ateco_sector'].map(atc_cd)
     df['ateco_industry'] = pd.Categorical(df['ateco_industry'])
     df['ateco_industry'] = df['ateco_industry'].cat.codes
+    
     return df
 
 def merge_interest_rates(df, preproc_params):
@@ -156,25 +157,34 @@ def financial_ratios(df, preproc_params):
     return df
 
 
-def preprocessing_func(df, preproc_params, label=True, interest_rates=True):
+def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=True):
     '''
     Parameters:
-        raw_df: Raw data dataframe
+        raw_df: Unpcrocessed dataframe
         preproc_params: Dictionary of parameters to use for preprocessor
-        new: Boolean, if True add class labels
+            "statement_offset": (int) months offset to use for financial statement availability
+            "ir_path": (str) path to the historical ECB interest rate csv
+            "features": (list of strings) features to retain in the processed dataframe
+        label: Boolean, if True add class labels
         interest_rates: Boolean, if True merge historical ECB interest rate data into df
-    
     Returns:
         Processed dataframe for model training/inference
-    '''    
+    '''
+    # Set default preproc_params if none are provided 
+    if preproc_params is None:
+            preproc_params = {
+        "statement_offset" : 6,
+        "ir_path": "ECB Data Portal_20231029154614.csv",
+        "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'ateco_industry','AR']
+    }
 
+    df = raw_df.copy()    
     df['stmt_date'] = pd.to_datetime(df['stmt_date'], format="%Y-%m-%d")
 
     # Convert Legal Structure & ATECO Code to categorical fields 
     df['legal_struct'] = pd.Categorical(df['legal_struct'])
     df['legal_struct'] = df['legal_struct'].cat.codes
     df['ateco_sector'] = pd.Categorical(df['ateco_sector'])
-    #df['ateco_sector'] = df['ateco_sector'].cat.codes
 
     # Consolidate ateco sectors into industry groups
     df = consolidate_ateco_codes(df)
@@ -187,7 +197,13 @@ def preprocessing_func(df, preproc_params, label=True, interest_rates=True):
 
     # Label defaulting firms
     if label:
+        feature_labels = df.columns # Save feature names
         df = label_defaults(df, preproc_params)
+        # Take difference between df labels to capture 'default' column label
+        all_labels = df.columns 
+        default_label = [x for x in all_labels if x not in feature_labels] 
+        # Add default column label to features so that it isn't removed in next step
+        preproc_params['features'].append(default_label[0]) 
 
     # Drop df columns not being used (for sklearn classifiers)
     processed_df = df.drop(columns=[col for col in df.columns if col not in preproc_params['features']])
@@ -201,14 +217,7 @@ def main():
     df = pd.read_csv("train.csv")
     print(f"Number of records:{len(df):,}")
     print("Preprocessing")
-    
-    preproc_params = {
-        "statement_offset" : 6,
-        "ir_path": "ECB Data Portal_20231029154614.csv",
-        "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'ateco_sector','ateco_industry','AR']
-    }
-
-    df_processed = preprocessing_func(df, preproc_params, label=True, interest_rates=True)
+    df_processed = preprocessing_func(df)
     print(f"Number of records:{len(df_processed):,}")
     df_processed.to_csv("train_processed_test.csv")
 
