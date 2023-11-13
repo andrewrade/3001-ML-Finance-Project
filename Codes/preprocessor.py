@@ -92,7 +92,14 @@ def label_defaults(df, preproc_params):
     return df
 
 def financial_ratios(df, preproc_params):
-
+    '''
+    Compute the financial ratios passed into preproc_params
+    Parameters:
+        df: dataframe used to compute the financial ratios 
+        preproc_params: dictionary, financial ratios to compute are passed into preproc_params['features]
+    Returns:
+        Dataframe including columns for each of the financial ratios passed 
+    '''
     features = preproc_params['features']
 
     # OpEX required to calculate defensive interval 
@@ -178,6 +185,8 @@ def categorical_to_csv(df):
     # Save the mappings to CSV
     legal_struct_mapping.to_csv('legal_struct_mapping.csv', index=False)
     ateco_industry_mapping.to_csv('ateco_sector_mapping.csv', index=False)
+    
+    return legal_struct_mapping, ateco_industry_mapping
 
 
 def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=True):
@@ -198,7 +207,7 @@ def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=T
             preproc_params = {
         "statement_offset" : 6,
         "ir_path": "ECB Data Portal_20231029154614.csv",
-        "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'ateco_industry','AR']
+        "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'ateco_industry', 'ateco_sector','AR']
     }
 
     df = raw_df.copy()    
@@ -206,16 +215,15 @@ def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=T
 
     try:
         legal_struct_mapping = pd.read_csv('legal_struct_mapping.csv')
-        ateco_industry_mapping = pd.read_csv('ateco_sector_mapping.csv')
+        ateco_industry_mapping = pd.read_csv('ateco_industry_mapping.csv')
     except:
-        categorical_to_csv(df)
-        legal_struct_mapping = pd.read_csv('legal_struct_mapping.csv')
-        ateco_industry_mapping = pd.read_csv('ateco_sector_mapping.csv')
+        legal_struct_mapping, ateco_industry_mapping = categorical_to_csv(df)
 
+    df['ateco_sector'] = pd.Categorical(df['ateco_sector'])
     # Map and encode 'legal_struct'
     df['legal_struct'] = df['legal_struct'].map(dict(zip(legal_struct_mapping['Original_Value'], legal_struct_mapping['Code'])))
     # Map and encode 'ateco_sector'
-    df['ateco_sector'] = df['ateco_sector'].map(dict(zip(ateco_industry_mapping['Original_Value'], ateco_industry_mapping['Code'])))
+    df['ateco_industry'] = df['ateco_industry'].map(dict(zip(ateco_industry_mapping['Original_Value'], ateco_industry_mapping['Code'])))
 
     # Compute any of the financial ratios passed into preproc_params['features]
     df = financial_ratios(df, preproc_params)
