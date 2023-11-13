@@ -1,22 +1,34 @@
 import pandas as pd
 import numpy as np
+from utils import default_check
 
-def default_check(row, date_range):
-    '''
-        Check if default occurs within the 12 month data range
-    '''
-    if pd.isnull(row['def_date']):
-        return 0
-    if row['def_date'] >= date_range[row['stmt_date']][0] and row['def_date'] < date_range[row['stmt_date']][1]:
-        return 1
-    return 0
 
-def consolidate_ateco_codes(df):
+def preprocesser_func(raw_df, preproc_params, new=True, interest_rates=True):
     '''
-    Consolidate ateco codes into industry groupings 
-    (as defined in the ATECO 2007 code  reference)
-    '''
-    # Ateco code to industry mapping
+    Parameters:
+        raw_df: Raw data dataframe
+        preproc_params: Dictionary of parameters to use for preprocessor
+        new: Boolean, if True add class labels
+        interest_rates: Boolean, if True merge historical ECB interest rate data into df
+    
+    Returns:
+        Processed dataframe for model training/inference
+    '''    
+    df = raw_df.copy()
+    df['stmt_date'] = pd.to_datetime(df['stmt_date'], format="%Y-%m-%d")
+    
+    # Merge historical ECB interest rate data
+    if interest_rates:
+        interest_rates = pd.read_csv(preproc_params['ir_path'])
+        interest_rates['DATE'] = pd.to_datetime(interest_rates['DATE'], format="%m/%d/%Y")
+        interest_rates.rename(columns={'ECB_Main_refinancing_operations': 'interest_rate'}, inplace=True)
+        
+        # Add 6 months to each statement date so joined interest has offset reflecting fin stmnt lag of ~6 months
+        interest_rates['offset_date'] = interest_rates['DATE'] + pd.DateOffset(months=preproc_params['statement_offset'])
+        df = pd.merge_asof(df.sort_values("stmt_date"), interest_rates.sort_values("offset_date"), 
+                           left_on='stmt_date', right_on='offset_date', direction='nearest')
+
+    ################## Ateco codes grouping #######################
     atc_cd = {1:"A",2:"A",3:"A",
           5:"B",6:"B",7:"B",8:"B",9:"B",
           10:"C",11:"C",12:"C",13:"C",14:"C",15:"C",16:"C",17:"C",18:"C",19:"C",20:"C",21:"C",22:"C",23:"C",24:"C",25:"C",26:"C",27:"C",28:"C",29:"C",30:"C",31:"C",32:"C",33:"C",
@@ -28,7 +40,7 @@ def consolidate_ateco_codes(df):
           55:"I",56:"I",
           58:"J",59:"J",60:"J",61:"J",62:"J",63:"J",
           64:"K",65:"K",66:"K",
-          68:"L",
+          68:"l",
           69:"M",70:"M",71:"M",72:"M",73:"M",74:"M",75:"M",
           77:"N",78:"N",79:"N",80:"N",81:"N",82:"N",
           84:"O",
@@ -37,180 +49,133 @@ def consolidate_ateco_codes(df):
           90:"R",91:"R",92:"R",93:"R",
           94:"S",95:"S",96:"S",
           97:"T",98:"T",
-          99:"U",
-          4: "V", # Adding additional industry mappings for the sector codes missing from the reference book
-          34: "W",
-          40: "X", 
-          44: "Y",
-          48: "Z",
-          54: "AA",
-          57: "AB",
-          67: "AC",
-          76: "AD",
-          83: "AE",
-          89: "AF"
-          }
+          99:"U"}
+    df['ateco_sec'] = df['ateco_sector'].map(atc_cd)
+    df['ateco_sec'] = pd.Categorical(df['ateco_sec'])
+    df['legal_struct'] = pd.Categorical(df['legal_struct'])
+    df['ateco_sector'] = pd.Categorical(df['ateco_sector'])
+
+    if new:
+        atc_cd_mapping = pd.DataFrame({
+            'Original_Value': df['ateco_sec'],
+            'Code': df['ateco_sec'].cat.codes
+        })
+
+        legal_struct_mapping = pd.DataFrame({
+            'Original_Value': df['legal_struct'],
+            'Code': df['legal_struct'].cat.codes
+        })
+
+        ateco_sector_mapping = pd.DataFrame({
+            'Original_Value': df['ateco_sector'],
+            'Code': df['ateco_sector'].cat.codes
+        })
+
+        atc_cd_mapping = atc_cd_mapping.drop_duplicates()
+        legal_struct_mapping = legal_struct_mapping.drop_duplicates()
+        ateco_sector_mapping = ateco_sector_mapping.drop_duplicates()
+
+        # Save the mappings to CSV files
+        atc_cd_mapping.to_csv('atc_cd_mapping.csv', index=False)
+        legal_struct_mapping.to_csv('legal_struct_mapping.csv', index=False)
+        ateco_sector_mapping.to_csv('ateco_sector_mapping.csv', index=False)
     
-    df['ateco_industry'] = df['ateco_sector'].map(atc_cd)
-    df['ateco_industry'] = pd.Categorical(df['ateco_industry'])
-    df['ateco_industry'] = df['ateco_industry'].cat.codes
-    return df
+        ateco_sec_mapping = pd.read_csv('atc_cd_mapping.csv')
+        legal_struct_mapping = pd.read_csv('legal_struct_mapping.csv')
+        ateco_sector_mapping = pd.read_csv('ateco_sector_mapping.csv')
 
-def merge_interest_rates(df, preproc_params):
-    '''
-    Merge historical interest rate data into df.
-    Interest rate is merged based on when statement data is available 
-    (statement date + offset)    
-    '''
-    interest_rates = pd.read_csv(preproc_params['ir_path'])
-    interest_rates['DATE'] = pd.to_datetime(interest_rates['DATE'], format="%m/%d/%Y")
-    interest_rates.rename(columns={'ECB_Main_refinancing_operations': 'interest_rate'}, inplace=True)
-        
-    # Add offset to interest rate dates to merge with offset
-    interest_rates['offset_date'] = interest_rates['DATE'] + pd.DateOffset(months=preproc_params['statement_offset'])
-    # Merge as_of due to imprecision when adding date offset
-    df = pd.merge_asof(df.sort_values("stmt_date"), interest_rates.sort_values("offset_date"), 
-                       left_on='stmt_date', right_on='offset_date', direction='nearest')
-    return df
 
-def label_defaults(df, preproc_params):
-    '''
-    Assign binary classification labels
-        1: Defaulted within 12 months from statement date + offset
-        0: Did not default within 12 months
-    '''
-    df['def_date'] = pd.to_datetime(df['def_date'], format="%d/%m/%Y")
+    # Map and encode 'ateco_sec'
+    df['ateco_sec'] = df['ateco_sec'].map(dict(zip(ateco_sec_mapping['Original_Value'], ateco_sec_mapping['Code'])))
+
+    # Map and encode 'legal_struct'
+    df['legal_struct'] = df['legal_struct'].map(dict(zip(legal_struct_mapping['Original_Value'], legal_struct_mapping['Code'])))
+
+    # Map and encode 'ateco_sector'
+    df['ateco_sector'] = df['ateco_sector'].map(dict(zip(ateco_sector_mapping['Original_Value'], ateco_sector_mapping['Code'])))
     
-    date_range = dict()
-    for date in df['stmt_date'].unique():
-        date = pd.to_datetime(date)
-        if pd.isnull(date):
-            continue
-        prediction_window_start = date + pd.DateOffset(months = preproc_params['statement_offset'])
-        prediction_window_end = date + pd.DateOffset(years = 1, months = preproc_params['statement_offset'])
-        date_range[date] = (prediction_window_start, prediction_window_end)
+
     
-    df['Default'] = df.apply(lambda x: default_check(x, date_range), axis=1)
-    return df
+    df['operating_expenses'] = (df['rev_operating'] - df['prof_operations'])\
+        .apply(lambda x: x if x > 0 else np.nan) # Operating expenses shouldn't be negative, set negative values to Nan
 
-def financial_ratios(df, preproc_params):
-
-    features = preproc_params['features']
-
-    # OpEX required to calculate defensive interval 
-    if 'operating_expenses' in features or 'defensive_interval' in features:
-        df['operating_expenses'] = (df['rev_operating'] - df['prof_operations']) \
-       .apply(lambda x: x if x > 0 else np.nan) # Operating expenses shouldn't be negative, set negative values to Nan
-
-    # Current liabilities required to calculate Current and Quick ratios
-    if 'current_liabilities' in features or 'current_ratio' in features or 'quick_ratio' in features:
-        df['current_liabilities'] = (df['debt_bank_st'] + df['debt_fin_st'] + df['AP_st'] + df['debt_st'])
-        df['current_liabilities'] = df['current_liabilities'].replace(0, 1) # Smoothing factor if current_liabilities = 0 
+    df['current_liabilities'] = (df['debt_bank_st'] + df['debt_fin_st'] + df['AP_st'] + df['debt_st'])
+    df['current_liabilities'] = df['current_liabilities'].replace(0, 1) # Smoothing factor if current_liabilities = 0 
 
     #################################### Liquidity Ratios ##########################################
     
-    if 'current_ratio' in features:
-        # Current Ratio = Current Assets / Current Liabilities
-        df['current_ratio'] = df['asst_current'] / (df['current_liabilities'])
+    # Current Ratio = Current Assets / Current Liabilities
+    df['current_ratio'] = df['asst_current'] / (df['current_liabilities'])\
     
-    if 'quick_ratio' in features:
-        # Quick Ratio = Immediate Short term Liquidity / Current Liabilities
-        df['quick_ratio'] = df['cash_and_equiv'] / (df['current_liabilities'])
-
-    if 'defensive_interval' in features:
-        # Defensive interval (liquidity ratio) = liquid assets / daily cash burn
-        df['defensive_interval'] = (df['cash_and_equiv'] + df['AR']) / ( df['operating_expenses'] / 365)
+    # Quick Ratio = Immediate Short term Liquidity / Current Liabilities
+    df['quick_ratio'] = df['cash_and_equiv'] / (df['current_liabilities'])
+    
+    # Defensive interval (liquidity ratio) = liquid assets / daily cash burn
+    df['defensive_interval'] = (df['cash_and_equiv'] + df['AR']) / ( df['operating_expenses'] / 365)
 
     ################################# Asset Management Ratios ######################################
     
-    if 'asset_turnover' in features:
-        # Asset turnover = rev_operations / asst_tot 
-        df['asset_turnover'] = df['rev_operating'] / df['asst_tot']
+    # Asset turnover = rev_operations / asst_tot 
+    df['asset_turnover'] = df['rev_operating'] / df['asst_tot']
 
     ###################################### Debt Ratios #############################################
     
-    if 'debt_to_equity' in features:
-        # Debt to equity = total debt / total equity
-        df['debt_to_equity'] = (df['debt_st'] + df['debt_lt']) / (df['eqty_tot'])\
-            .apply(lambda x: x if x != 0 else 1) # Smoothing factor if eqty_tot = 0
+    # Debt to equity = total debt / total equity
+    df['debt_to_equity'] = (df['debt_st'] + df['debt_lt']) / (df['eqty_tot'])\
+        .apply(lambda x: x if x != 0 else 1) # Smoothing factor if eqty_tot = 0
     
     # Debt to EBITDA = total debt / EDBITA
-    if 'debt_to_ebitda' in features:
-        df['debt_to_ebitda'] = (df['debt_st'] + df['debt_lt']) / df['ebitda']\
-            .apply(lambda x: x if x != 0 else 1) # Smoothing factor if ebitda = 0
+    df['debt_to_ebitda'] = (df['debt_st'] + df['debt_lt']) / df['ebitda']\
+        .apply(lambda x: x if x != 0 else 1) # Smoothing factor if ebitda = 0
     
-    if 'cfo_to_debt' in features:
-        # CFO to debt ratio = Cash flow from operations / total debt
-        df['cfo_to_debt'] = df['cf_operations'] / (df['debt_st'] + df['debt_lt'])\
-            .apply(lambda x: x if x != 0 else 1) # Smoothing factor if debt = 0
+    # CFO to debt ratio = Cash flow from operations / total debt
+    df['cfo_to_debt'] = df['cf_operations'] / (df['debt_st'] + df['debt_lt'])\
+        .apply(lambda x: x if x != 0 else 1) # Smoothing factor if debt = 0
     
-    if 'cfo_to_op_earnings' in features:
-        # CFO to operating earnings ratio = Cash flow from operations / operating_profit
-        df['cfo_to_op_earnings'] = df['cf_operations'] / df['prof_operations']\
-            .apply(lambda x: x if x != 0 else 1) # Smoothing factor if prof_operations = 0
+    # CFO to operating earnings ratio = Cash flow from operations / operating_profit
+    df['cfo_to_op_earnings'] = df['cf_operations'] / df['prof_operations']\
+        .apply(lambda x: x if x != 0 else 1) # Smoothing factor if prof_operations = 0
     
-    if 'leverage_ratio' in features:
-        # Leverage ratio = total liabilities / total assets
-        df['leverage_ratio'] = (df['asst_tot'] - df['eqty_tot']) / df['asst_tot']
-    
-    return df
+    # Leverage ratio = total liabilities / total assets
+    df['leverage_ratio'] = (df['asst_tot'] - df['eqty_tot']) / df['asst_tot']
 
-
-def preprocessing_func(df, preproc_params, label=True, interest_rates=True):
-    '''
-    Parameters:
-        raw_df: Raw data dataframe
-        preproc_params: Dictionary of parameters to use for preprocessor
-        new: Boolean, if True add class labels
-        interest_rates: Boolean, if True merge historical ECB interest rate data into df
-    
-    Returns:
-        Processed dataframe for model training/inference
-    '''    
-
-    df['stmt_date'] = pd.to_datetime(df['stmt_date'], format="%Y-%m-%d")
-
-    # Convert Legal Structure & ATECO Code to categorical fields 
-    df['legal_struct'] = pd.Categorical(df['legal_struct'])
-    df['legal_struct'] = df['legal_struct'].cat.codes
-    df['ateco_sector'] = pd.Categorical(df['ateco_sector'])
-    #df['ateco_sector'] = df['ateco_sector'].cat.codes
-
-    # Consolidate ateco sectors into industry groups
-    df = consolidate_ateco_codes(df)
-    # Compute any of the financial ratios passed into preproc_params['features]
-    df = financial_ratios(df, preproc_params)
-    
-    # Merge historical ECB interest rate data
-    if interest_rates:
-        df = merge_interest_rates(df, preproc_params)
-
-    # Label defaulting firms
-    if label:
-        df = label_defaults(df, preproc_params)
+    # Assign class labels
+    if new:
+        df['def_date'] = pd.to_datetime(df['def_date'], format="%d/%m/%Y")
+        date_range = dict()
+        for date in df['stmt_date'].unique():
+            date = pd.to_datetime(date)
+            if pd.isnull(date):
+                continue
+            prediction_window_start = date + pd.DateOffset(months = preproc_params['statement_offset'])
+            prediction_window_end = date + pd.DateOffset(years = 1, months = preproc_params['statement_offset'])
+            date_range[date] = (prediction_window_start, prediction_window_end)
+        df['Default'] = df.apply(lambda x: default_check(x, date_range), axis=1)
 
     # Drop df columns not being used (for sklearn classifiers)
-    processed_df = df.drop(columns=[col for col in df.columns if col not in preproc_params['features']])
+    #processed_df = df.drop(columns=[col for col in df.columns if col not in preproc_params['features']])
     
-    return processed_df
+    return df
     
 
 def main():
     
     print("Loading training data")
-    df = pd.read_csv("train.csv")
+    df = pd.read_csv(r"/Users/chitvangoyal/Desktop/3001_project/3001-ML-Finance-Project/train.csv")
     print(f"Number of records:{len(df):,}")
     print("Preprocessing")
     
     preproc_params = {
         "statement_offset" : 6,
-        "ir_path": "ECB Data Portal_20231029154614.csv",
-        "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'ateco_sector','ateco_industry','AR']
+        "ir_path": r"/Users/chitvangoyal/Desktop/3001_project/3001-ML-Finance-Project/ECB Data Portal_20231029154614.csv",
+        "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'AR']
     }
 
-    df_processed = preprocessing_func(df, preproc_params, label=True, interest_rates=True)
+    df_processed = preprocesser_func(df, preproc_params, new=True, interest_rates=True)
     print(f"Number of records:{len(df_processed):,}")
-    df_processed.to_csv("train_processed_test.csv")
+    
+    df_processed.to_csv(r"/Users/chitvangoyal/Desktop/3001_project/3001-ML-Finance-Project/train_processed.csv")
+
 
 
 if __name__ == "__main__":
