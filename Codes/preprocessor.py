@@ -183,8 +183,8 @@ def categorical_to_csv(df):
     legal_struct_mapping = legal_struct_mapping.drop_duplicates()
 
     # Save the mappings to CSV
-    legal_struct_mapping.to_csv('legal_struct_mapping.csv', index=False)
-    ateco_industry_mapping.to_csv('ateco_sector_mapping.csv', index=False)
+    legal_struct_mapping.to_csv('csv_files/legal_struct_mapping.csv', index=False)
+    ateco_industry_mapping.to_csv('csv_files/ateco_sector_mapping.csv', index=False)
     
     return legal_struct_mapping, ateco_industry_mapping
 
@@ -213,9 +213,10 @@ def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=T
     df = raw_df.copy()    
     df['stmt_date'] = pd.to_datetime(df['stmt_date'], format="%Y-%m-%d")
 
+    # Read categorical variable encodings from csv, or create the csvs if they don't already exist
     try:
-        legal_struct_mapping = pd.read_csv('legal_struct_mapping.csv')
-        ateco_industry_mapping = pd.read_csv('ateco_industry_mapping.csv')
+        legal_struct_mapping = pd.read_csv('csv_files/legal_struct_mapping.csv')
+        ateco_industry_mapping = pd.read_csv('csv_files/ateco_industry_mapping.csv')
     except:
         legal_struct_mapping, ateco_industry_mapping = categorical_to_csv(df)
 
@@ -251,12 +252,12 @@ def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=T
 def main():
     
     print("Loading training data")
-    df = pd.read_csv("train.csv")
+    df = pd.read_csv("csv_files/train.csv")
     print(f"Number of records:{len(df):,}")
     print("Preprocessing")
     df_processed = preprocessing_func(df, label=True, interest_rates=True)
     print(f"Number of records:{len(df_processed):,}")
-    df_processed.to_csv("train_processed_test.csv")
+    df_processed.to_csv("csv_files/train_processed.csv")
 
 
 if __name__ == "__main__":
