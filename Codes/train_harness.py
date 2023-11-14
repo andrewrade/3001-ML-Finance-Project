@@ -14,7 +14,7 @@ from walk_forward import bootstrapped_walk_forward_harness
 preproc_params = {
         "statement_offset" : 6,
         "ir_path": "csv_files/ECB Data Portal_20231029154614.csv",
-        "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'ateco_industry', 'legal_struct', 'stmt_date', 'id','AR'],
+        "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'ateco_industry', 'stmt_date', 'id','AR'],
         "categorical_mapping_path": {
                 'ateco_industry': 'csv_files/ateco_industry_mapping.csv',
                 'legal_struct': 'csv_files/ateco_industry_mapping.csv'
