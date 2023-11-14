@@ -3,8 +3,6 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-import statsmodels.api as sm
-from sklearn.ensemble import RandomForestClassifier
 import joblib
 from preprocessor import preprocessing_func
 from estimate import estimation
@@ -21,11 +19,18 @@ preproc_params = {
             }
     }
 
+model_type = 'XGboost' # 'Logit', 'Ranom_Forest' or 'XGboost' 
+
 df = pd.read_csv('csv_files/train.csv')
-df.head()
 start_index = df['stmt_date'].min()
-model_type = 'XGboost'
 model, test_stats_list, out_of_sample_stats_list = bootstrapped_walk_forward_harness(df, preprocessor_function = preprocessing_func, preproc_params=preproc_params, train_function = estimation, start_index=start_index, step_size=1, num_bootstrap_samples=10, model_type=model_type)
 
-filename = 'xgb_model.sav'
+match model_type:
+    case 'XGboost':
+        filename = 'xgb_model.sav'
+    case 'Logit':
+        filename = 'basic_model.sav'
+    case 'Random_Forest':
+        filename = 'rf_model.sav'
+
 joblib.dump(model, filename)
