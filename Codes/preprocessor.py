@@ -215,10 +215,13 @@ def one_hot_encoder(df, preproc_params, categorical_features):
 
     encoders = create_encoders_from_csv(preproc_params['categorical_mapping_path'])
     transformers = [(feature, encoders[feature] ,[feature]) for feature in categorical_features]
+    print(transformers)
     column_transformer = ColumnTransformer(transformers, remainder='passthrough') # Transfrom only cat features, remainder pass through
 
     one_hot_encoded = column_transformer.fit_transform(df_non_datetime)
-    one_hot_encoded = one_hot_encoded.toarray() # Column transformer outputs sparse matrix, convert to dense
+    
+    if issparse(one_hot_encoded):
+        one_hot_encoded = one_hot_encoded.toarray() # Column transformer outputs sparse matrix, convert to dense
 
     new_columns = []
     for feature in categorical_features:
@@ -255,7 +258,7 @@ def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=T
             preproc_params = {
         "statement_offset" : 6,
         "ir_path": "csv_files/ECB Data Portal_20231029154614.csv",
-        "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'ateco_industry', 'ateco_sector','AR'],
+        "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'ateco_industry','AR'],
         "categorical_mapping_path":     {
                 'ateco_industry': 'csv_files/ateco_industry_mapping.csv',
                 'legal_struct': 'csv_files/legal_struct_mapping.csv'
@@ -268,46 +271,51 @@ def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=T
     # Compute any of the financial ratios passed into preproc_params['features]
     df = financial_ratios(df, preproc_params)
     
-    # Merge historical ECB interest rate data
-    if interest_rates:
+    if interest_rates: # Merge historical ECB interest rate data
         df = merge_interest_rates(df, preproc_params)
 
-    # Label defaulting firms
-    if label:
+    if label: # Label defaulting firms
         feature_labels = df.columns # Save feature names
         df = label_defaults(df, preproc_params)
-        # Take difference between df labels to capture 'default' column label
         all_labels = df.columns 
-        default_label = [x for x in all_labels if x not in feature_labels] 
-        # Add default column label to features so that it isn't removed in next step
-        preproc_params['features'].append(default_label[0]) 
+        default_label = [x for x in all_labels if x not in feature_labels] # Take difference between df labels to capture 'default' column label
+        preproc_params['features'].append(default_label[0]) # Add default column label to features so that it isn't removed in next step
 
     # Drop df columns not being used (for sklearn classifiers)
     processed_df = df.drop(columns=[col for col in df.columns if col not in preproc_params['features']])
 
-    categorical_features = [x for x in processed_df.columns if x in preproc_params['categorical_mapping_path'].keys()]
+    categorical_features = [x for x in preproc_params['features'] if x in preproc_params['categorical_mapping_path'].keys()]
 
-    if len(categorical_features) > 0: # Check if any categorical variables are needed
+    # Check if any categorical variables are needed, do this after dropping columns since OH encoding introduces new feature names
+    if len(categorical_features) > 0: 
+        
+        if 'ateco_industry' in preproc_params['features']:
+            processed_df['ateco_industry'] = consolidate_ateco_codes(df)['ateco_industry'] # Create ateco_industry column by consolidating sector codes
+        
         # Read categorical variable encodings from csv, or create the csvs if they don't already exist
         try: 
             legal_struct_mapping = pd.read_csv(preproc_params['categorical_mapping_path']['legal_struct'])
             ateco_industry_mapping = pd.read_csv(preproc_params['categorical_mapping_path']['ateco_industry'])
         except:
             legal_struct_mapping, ateco_industry_mapping = categorical_to_csv(df)
-
+       
         if one_hot_encode: # One hot encode for XGboost
             processed_df = one_hot_encoder(processed_df, preproc_params, categorical_features)
         
         else: # Directly use categoricals for Logit, Random Forest
-        
+            
             if 'ateco_sector' in preproc_params['features']:
                 processed_df['ateco_sector'] = pd.Categorical(df['ateco_sector'])
+            
             # Map and encode 'legal_struct'
             if 'legal_struct' in preproc_params['features']:
-                processed_df['legal_struct'] = processed_df['legal_struct'].map(dict(zip(legal_struct_mapping['Original_Value'], legal_struct_mapping['Code'])))
+                processed_df['legal_struct'] = processed_df['legal_struct'].\
+                    map(dict(zip(legal_struct_mapping['Original_Value'], legal_struct_mapping['Code'])))
+            
             # Map and encode 'ateco_sector'
             if 'ateco_industry' in preproc_params['features']:
-                processed_df['ateco_industry'] = processed_df['ateco_industry'].map(dict(zip(ateco_industry_mapping['Original_Value'], ateco_industry_mapping['Code'])))
+                processed_df['ateco_industry'] = processed_df['ateco_industry'].\
+                    map(dict(zip(ateco_industry_mapping['Original_Value'], ateco_industry_mapping['Code'])))
     
     return processed_df
     

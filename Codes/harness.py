@@ -17,15 +17,15 @@ args = parser.parse_args()
 input_file = args.input_csv
 output_file = args.output_csv
 
-model_file = 'basic_model.sav'
+model_file = 'rf_model.sav'
 model = joblib.load(model_file)
 test = pd.read_csv(input_file).drop('def_date', axis=1)
-model_type='Logit'
+model_type='Random_Forest'
 
 preproc_params = {
     "statement_offset" : 6,
     "ir_path": "csv_files/ECB Data Portal_20231029154614.csv",
-    "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'AR', 'stmt_date', 'id']
+    "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'AR', 'ateco_industry', 'legal_struct']
 }
 
 test = preprocessing_func(test, preproc_params, label=False, interest_rates=True)

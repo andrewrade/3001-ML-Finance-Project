@@ -3,14 +3,6 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from prediction import predict_function
-
-def default_check(row, date_range):
-    if pd.isnull(row['def_date']):
-        return 0
-    if row['def_date'] >= date_range[row['stmt_date']][0] and row['def_date'] < date_range[row['stmt_date']][1]:
-        return 1
-    return 0
 
 def stratified_split(df, label):
     grouped_df = df.groupby('id').agg({'id': 'count', label: 'max'})
@@ -22,23 +14,6 @@ def stratified_split(df, label):
     out_of_sample_companies = out_of_sample_companies['id'].values
 
     return df[df.id.isin(in_sample_companies)], df[df.id.isin(out_of_sample_companies)]
-
-def predict_harness(test, model, model_type):
-    predictions = predict_function(test_df = test, model= model, model_type = model_type)
-
-    new_prediction_df = pd.DataFrame({
-        'Actual': test['Default'],
-        'Predicted': predictions
-    }).replace([np.inf, -np.inf], np.nan).dropna()
-    actual_values = new_prediction_df['Actual']
-    new_predictions =  new_prediction_df['Predicted']
-
-    try:
-        auc_roc = roc_auc_score(actual_values, new_predictions)
-    except:
-        auc_roc = np.nan
-        
-    return test['Default'], predictions, auc_roc
 
 def plot_roc_distribution(roc_values):
     auc_values = [roc_value[2] for roc_value in roc_values]
