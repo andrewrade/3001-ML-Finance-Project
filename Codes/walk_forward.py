@@ -3,7 +3,7 @@ from tqdm import tqdm
 import pandas as pd
 import numpy as np
 import estimate
-from prediction import predict_function
+from prediction import predict_harness
 
 def bootstrapped_walk_forward_harness(df, preprocessor_function, preproc_params, train_function, start_index, step_size=1, num_bootstrap_samples = 10, model_type='Logit'):
     df = preprocessor_function(df, preproc_params, label=True, interest_rates=True)
