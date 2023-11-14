@@ -14,11 +14,11 @@ def estimation(df_train, model_type=None, seed = 42):
         Trained model of model_type
     '''
     match model_type:
+        
         case 'Logit':
-            # Builds statsmodel formula string by concatenating df column names 
-            features = [x for x in df_train.columns if x != 'Default']
+            features = [x for x in df_train.columns if x != 'Default'] # Remove label 
             formula = r"Default ~ " 
-            for i, x in enumerate(features):
+            for i, x in enumerate(features): # Builds statsmodel formula string by concatenating df column names 
                 formula += x.strip() 
                 if i < len(features) - 1:
                     formula += " + "
@@ -29,8 +29,7 @@ def estimation(df_train, model_type=None, seed = 42):
             return logit_model
             
         case 'Random_Forest':
-            # Sklearn RF can't handle nans in input 
-            df_train = df_train.dropna()
+            df_train = df_train.dropna() # Sklearn RF can't handle nans in input 
             y_train = df_train['Default']
 
             # Remove statement datetime column(s) from walk forward calls 
@@ -44,9 +43,19 @@ def estimation(df_train, model_type=None, seed = 42):
             return clf
         
         case 'XGboost':
-            pass
-        
-        
+            y_train = df_train['Default']
+            X_train = X_train.drop('Default', axis=1)
+            
+            clf = xgb.XGBClassifier(
+                objective='binary:logistic', 
+                num_class=2,
+                grow_policy=1,# Greedy splits
+                seed=seed
+                )
+            
+            clf.fit(X_train, y_train)
+            return clf
+
         case _:
             raise ValueError(f"Invalid model_type: {model_type}. Supported types are 'Logit' and 'Random_Forest'.")
         
