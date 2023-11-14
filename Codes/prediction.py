@@ -2,21 +2,36 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, roc_auc_score
-from sklearn.model_selection import train_test_split
+from pandas.api.types import is_datetime64_any_dtype
 
 def predict_function(df, model=None, model_type='Logit'):
     '''
     returns probability
     not calculating AUC because hold out data will not have label column
     '''
-    if model_type == 'Random_Forest':
-        predictions = model.predict_proba(df)
-        return(predictions[:, 1])
-    elif model_type == 'Logit':
-        predictions = model.predict(df)
-        return(predictions)
-    else:
-        raise ValueError(f"Invalid model_type: {model_type}. Supported types are 'Logit' and 'Random_Forest'.")
+    match model_type:
+        
+        case 'Random_Forest':
+            # Remove datetime columns from walk forward calls
+            feats_datetime_removed = [x for x in df.columns if not is_datetime64_any_dtype(df[x])]
+            print(feats_datetime_removed)
+            
+            # Skip rows where any featuers are nan, predict_proba method cannot handle nans
+            nan_mask = df.isna().any(axis=1) # If any single feature is nan, set the records PD to nan 
+            records_to_predict = df[~nan_mask]
+            print(records_to_predict[feats_datetime_removed])
+            filtered_df = model.predict(records_to_predict[feats_datetime_removed]) 
+            predictions = np.full((df.shape[0], model.n_classes_), np.nan) # Intialize predictions as nans
+            predictions[~nan_mask] = filtered_df # Set non-nan indices to PDs computed in filtered_df
+
+            return(predictions[:, 1])
+        
+        case 'Logit':
+            predictions = model.predict(df)
+            return(predictions)
+        
+        case _:
+            raise ValueError(f"Invalid model_type: {model_type}. Supported types are 'Logit' and 'Random_Forest'.")
     
 def predict_harness(df, model, model_type, plot_auc=True):
     '''
