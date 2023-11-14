@@ -73,5 +73,10 @@ def predict_harness(df, model, model_type, plot_auc=True):
         except:
             auc_roc = np.nan
         return df['Default'], predictions, auc_roc
+    
+    ###############################################################
+    # TO DO: CALIBRATE PREDICTIONS USING METHODS IN OPTIMIZATION.PY
+    ###############################################################
+
 
     return predictions
