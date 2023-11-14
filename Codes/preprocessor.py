@@ -215,7 +215,6 @@ def one_hot_encoder(df, preproc_params, categorical_features):
 
     encoders = create_encoders_from_csv(preproc_params['categorical_mapping_path'])
     transformers = [(feature, encoders[feature] ,[feature]) for feature in categorical_features]
-    print(transformers)
     column_transformer = ColumnTransformer(transformers, remainder='passthrough') # Transfrom only cat features, remainder pass through
 
     one_hot_encoded = column_transformer.fit_transform(df_non_datetime)
