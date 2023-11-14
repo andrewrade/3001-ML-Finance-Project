@@ -34,17 +34,10 @@ def predict_harness(df, model, model_type, plot_auc=True):
         plot_auc == False:
             predictions: (n x 1) ndarray with PDs 
     '''
-    
     predictions = predict_function(df, model=model, model_type=model_type)
 
     # Plot aucs when labels are known (during Walk forward validation)
     if plot_auc:
-        '''
-            Returns:
-                test['default']: (n x 1) series with class labels
-                predictions: (n x 1) ndarray with PDs 
-                auc_roc: auc_roc score based off predictions/class labels
-        '''
         new_prediction_df = pd.DataFrame({
             'Actual': df['Default'],
             'Predicted': predictions
