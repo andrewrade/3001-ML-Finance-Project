@@ -3,6 +3,14 @@ from sklearn.ensemble import RandomForestClassifier
 import xgboost as xgb
 from pandas.api.types import is_datetime64_any_dtype
 
+def remove_date_features(df):
+    '''
+        Remove datetime fields from walkforward analysis. 
+        Datetime fields need to be removed before training tree based models
+    '''
+    keep = [x for x in df.columns if not is_datetime64_any_dtype(df[x])]
+    return df[keep]
+
 def estimation(df_train, model_type=None, seed = 42):
     '''
      Trains a model of the requested type
@@ -33,9 +41,7 @@ def estimation(df_train, model_type=None, seed = 42):
             y_train = df_train['Default']
 
             # Remove statement datetime column(s) from walk forward calls 
-            feats_datetime_removed = [x for x in df_train.columns if not is_datetime64_any_dtype(df_train[x])]
-            
-            X_train = df_train[feats_datetime_removed]
+            X_train = remove_date_features(df_train)
             X_train = X_train.drop('Default', axis=1)
             
             clf = RandomForestClassifier()
@@ -45,7 +51,10 @@ def estimation(df_train, model_type=None, seed = 42):
         case 'XGboost':
             y_train = df_train['Default']
             X_train = X_train.drop('Default', axis=1)
-            
+
+            # Remove statement datetime column(s) from walk forward calls 
+            X_train = remove_date_features(X_train)
+                        
             clf = xgb.XGBClassifier(
                 objective='binary:logistic', 
                 num_class=2,
