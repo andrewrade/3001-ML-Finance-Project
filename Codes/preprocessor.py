@@ -1,5 +1,8 @@
 import pandas as pd
 import numpy as np
+from scipy.sparse import issparse
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
 
 def default_check(row, date_range):
     '''
@@ -184,12 +187,55 @@ def categorical_to_csv(df):
 
     # Save the mappings to CSV
     legal_struct_mapping.to_csv('csv_files/legal_struct_mapping.csv', index=False)
-    ateco_industry_mapping.to_csv('csv_files/ateco_sector_mapping.csv', index=False)
+    ateco_industry_mapping.to_csv('csv_files/ateco_industry_mapping.csv', index=False)
     
     return legal_struct_mapping, ateco_industry_mapping
 
+def create_encoders_from_csv(mappings):
+    '''
+    Create one-hot encoder based off category codes
+    stored in external csvs
+    '''
+    encoders = {}
+    for feature, mapping_file in mappings.items():
+        mapping_df = pd.read_csv(mapping_file)
+        categories = mapping_df['Code'].unique()
+        encoder = OneHotEncoder(categories=[categories], handle_unknown='ignore')
+        encoders[feature] = encoder
+    return encoders
 
-def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=True):
+def one_hot_encoder(df, preproc_params, categorical_features):
+    '''
+    One hot encode categorical variables for algorithms that don't directly 
+    support categoricals (ie XGBoost)
+    '''
+    # Separate out the datetime columns
+    datetime_cols = df.select_dtypes(include=['datetime64']).copy()
+    df_non_datetime = df.drop(datetime_cols.columns, axis=1)
+
+    encoders = create_encoders_from_csv(preproc_params['categorical_mapping_path'])
+    transformers = [(feature, encoders[feature] ,[feature]) for feature in categorical_features]
+    column_transformer = ColumnTransformer(transformers, remainder='passthrough') # Transfrom only cat features, remainder pass through
+
+    one_hot_encoded = column_transformer.fit_transform(df_non_datetime)
+    one_hot_encoded = one_hot_encoded.toarray() # Column transformer outputs sparse matrix, convert to dense
+
+    new_columns = []
+    for feature in categorical_features:
+        transform_name = feature
+        feature_names = column_transformer.named_transformers_[transform_name].get_feature_names_out([feature])
+        new_columns.extend(feature_names)
+    
+    remaining_columns = [col for col in df_non_datetime.columns if col not in categorical_features]
+    all_columns = list(new_columns) + remaining_columns
+
+    df_transformed = pd.DataFrame(one_hot_encoded, columns=all_columns, index=df_non_datetime.index) # Convert to df with all colum labels
+    df_transformed = pd.concat([df_transformed, datetime_cols], axis=1)
+    
+    return df_transformed
+
+
+def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=True, one_hot_encode=False):
     '''
     Parameters:
         raw_df: Unpcrocessed dataframe
@@ -197,6 +243,8 @@ def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=T
             "statement_offset": (int) months offset to use for financial statement availability
             "ir_path": (str) path to the historical ECB interest rate csv
             "features": (list of strings) features to retain in the processed dataframe
+            "categorical_mapping_path": (dictionary) this dictionary maps the categorical variables to 
+                the csv path storing the translation between categorical variables and integer codes
         label: Boolean, True if add class labels
         interest_rates: Boolean, if True merge historical ECB interest rate data into df
     Returns:
@@ -206,25 +254,16 @@ def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=T
     if preproc_params is None:
             preproc_params = {
         "statement_offset" : 6,
-        "ir_path": "ECB Data Portal_20231029154614.csv",
-        "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'ateco_industry', 'ateco_sector','AR']
+        "ir_path": "csv_files/ECB Data Portal_20231029154614.csv",
+        "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'ateco_industry', 'ateco_sector','AR'],
+        "categorical_mapping_path":     {
+                'ateco_industry': 'csv_files/ateco_industry_mapping.csv',
+                'legal_struct': 'csv_files/legal_struct_mapping.csv'
+            }
     }
 
     df = raw_df.copy()    
     df['stmt_date'] = pd.to_datetime(df['stmt_date'], format="%Y-%m-%d")
-
-    # Read categorical variable encodings from csv, or create the csvs if they don't already exist
-    try:
-        legal_struct_mapping = pd.read_csv('csv_files/legal_struct_mapping.csv')
-        ateco_industry_mapping = pd.read_csv('csv_files/ateco_industry_mapping.csv')
-    except:
-        legal_struct_mapping, ateco_industry_mapping = categorical_to_csv(df)
-
-    df['ateco_sector'] = pd.Categorical(df['ateco_sector'])
-    # Map and encode 'legal_struct'
-    df['legal_struct'] = df['legal_struct'].map(dict(zip(legal_struct_mapping['Original_Value'], legal_struct_mapping['Code'])))
-    # Map and encode 'ateco_sector'
-    df['ateco_industry'] = df['ateco_industry'].map(dict(zip(ateco_industry_mapping['Original_Value'], ateco_industry_mapping['Code'])))
 
     # Compute any of the financial ratios passed into preproc_params['features]
     df = financial_ratios(df, preproc_params)
@@ -245,6 +284,30 @@ def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=T
 
     # Drop df columns not being used (for sklearn classifiers)
     processed_df = df.drop(columns=[col for col in df.columns if col not in preproc_params['features']])
+
+    categorical_features = [x for x in processed_df.columns if x in preproc_params['categorical_mapping_path'].keys()]
+
+    if len(categorical_features) > 0: # Check if any categorical variables are needed
+        # Read categorical variable encodings from csv, or create the csvs if they don't already exist
+        try: 
+            legal_struct_mapping = pd.read_csv(preproc_params['categorical_mapping_path']['legal_struct'])
+            ateco_industry_mapping = pd.read_csv(preproc_params['categorical_mapping_path']['ateco_industry'])
+        except:
+            legal_struct_mapping, ateco_industry_mapping = categorical_to_csv(df)
+
+        if one_hot_encode: # One hot encode for XGboost
+            processed_df = one_hot_encoder(processed_df, preproc_params, categorical_features)
+        
+        else: # Directly use categoricals for Logit, Random Forest
+        
+            if 'ateco_sector' in preproc_params['features']:
+                processed_df['ateco_sector'] = pd.Categorical(df['ateco_sector'])
+            # Map and encode 'legal_struct'
+            if 'legal_struct' in preproc_params['features']:
+                processed_df['legal_struct'] = processed_df['legal_struct'].map(dict(zip(legal_struct_mapping['Original_Value'], legal_struct_mapping['Code'])))
+            # Map and encode 'ateco_sector'
+            if 'ateco_industry' in preproc_params['features']:
+                processed_df['ateco_industry'] = processed_df['ateco_industry'].map(dict(zip(ateco_industry_mapping['Original_Value'], ateco_industry_mapping['Code'])))
     
     return processed_df
     

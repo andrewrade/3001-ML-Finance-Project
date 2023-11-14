@@ -10,6 +10,10 @@ def predict_function(df, model=None, model_type='Logit'):
     not calculating AUC because hold out data will not have label column
     '''
     match model_type:
+
+        case 'Logit':
+            predictions = model.predict(df)
+            return(predictions)
         
         case 'Random_Forest':
             # Remove datetime columns and default column from walk forward calls
@@ -26,14 +30,11 @@ def predict_function(df, model=None, model_type='Logit'):
 
             return(predictions[:, 1])
         
-        case 'Logit':
-            predictions = model.predict(df)
-            return(predictions)
-        
         case 'XGboost':
             # Remove datetime columns and default column from walk forward calls
             feats_filtered = [x for x in df.columns if not is_datetime64_any_dtype(df[x]) and x != 'Default']
-            predictions = model.predict_proba(df)
+            X_train = df[feats_filtered]
+            predictions = model.predict_proba(X_train)
 
             return(predictions[:, 1])
         

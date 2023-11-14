@@ -1,7 +1,9 @@
+import pandas as pd
+from pandas.api.types import is_datetime64_any_dtype
 import statsmodels.api as sm
 from sklearn.ensemble import RandomForestClassifier
 import xgboost as xgb
-from pandas.api.types import is_datetime64_any_dtype
+
 
 def remove_date_features(df):
     '''
@@ -50,15 +52,17 @@ def estimation(df_train, model_type=None, seed = 42):
         
         case 'XGboost':
             y_train = df_train['Default']
+            X_train = df_train
             X_train = X_train.drop('Default', axis=1)
 
             # Remove statement datetime column(s) from walk forward calls 
             X_train = remove_date_features(X_train)
-                        
+
+            print(X_train.columns)
+
             clf = xgb.XGBClassifier(
                 objective='binary:logistic', 
-                num_class=2,
-                grow_policy=1,# Greedy splits
+                grow_policy='depthwise',
                 seed=seed
                 )
             
