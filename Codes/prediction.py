@@ -18,7 +18,7 @@ def predict_function(df, model=None, model_type='Logit'):
         case 'Random_Forest':
             # Remove datetime columns and default column from walk forward calls
             feats_filtered = remove_date_features(df)
-            feats_filtered = feats_filtered.drop('Default', axis=1)
+            feats_filtered = [x for x in df.columns if x != 'Default']
             
             # Skip rows where any featuers are nan, predict_proba method cannot handle nans
             nan_mask = df.isna().any(axis=1).to_numpy() # If any single feature is nan, set the records PD to nan 
@@ -34,9 +34,9 @@ def predict_function(df, model=None, model_type='Logit'):
         case 'XGboost':
             # Remove datetime columns and default column from walk forward calls
             feats_filtered = remove_date_features(df)
-            feats_filtered = feats_filtered.drop('Default', axis=1)
+            feats_filtered = [x for x in df.columns if x != 'Default']
             
-            X_train = df[feats_filtered.columns]
+            X_train = df[feats_filtered]
             predictions = model.predict_proba(X_train)
 
             return(predictions[:, 1])
