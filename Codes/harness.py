@@ -68,6 +68,7 @@ def main():
         }
     }
 
+    print(features)
     test = pd.read_csv(input_file).drop('def_date', axis=1)
     test = preprocessing_func(test, preproc_params, label=False, interest_rates=True, 
                             one_hot_encode=one_hot_encode) # When selecting XGboost need to set `one_hot_encode` to True
