@@ -27,10 +27,10 @@ model, test_stats_list, out_of_sample_stats_list = bootstrapped_walk_forward_har
 
 match model_type:
     case 'XGboost':
-        filename = 'xgb_model.sav'
+        filename = 'models/xgb_model.sav'
     case 'Logit':
-        filename = 'basic_model.sav'
+        filename = 'models/basic_model.sav'
     case 'Random_Forest':
-        filename = 'rf_model.sav'
+        filename = 'models/rf_model.sav'
 
 joblib.dump(model, filename)

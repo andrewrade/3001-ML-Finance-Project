@@ -2,7 +2,6 @@ import pandas as pd
 import argparse
 import joblib
 from preprocessor import preprocessing_func
-
 from prediction import predict_harness
 
 parser = argparse.ArgumentParser()
@@ -25,17 +24,17 @@ model_type='Logit' # <<<<<< Change Model here
 match model_type:
     
     case 'XGboost':
-        model_file = 'xgb_model.sav'
+        model_file = 'models/xgb_model.sav'
         model = joblib.load(model_file)
         features = model.feature_names_in_
         one_hot_encode = True
     case 'Logit':
-        model_file = 'basic_model.sav'
+        model_file = 'models/basic_model.sav'
         model = joblib.load(model_file)
         features = model.params.index
         one_hot_encode = False
     case 'Random_Forest':
-        model_file = 'rf_model.sav'
+        model_file = 'models/rf_model.sav'
         model = joblib.load(model_file)
         features = model.feature_names_in_
         one_hot_encode = False
