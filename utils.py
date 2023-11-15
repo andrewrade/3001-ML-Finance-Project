@@ -67,38 +67,6 @@ def plot_roc_distribution(roc_values):
     plt.title('Receiver Operating Characteristic, Average AUC = {:.2f})'.format(auc))
     plt.legend()
 
-def plot_auc_rocs(actual_values, predictions, out_of_sample_truth=None, out_of_sample_predictions=None):
-    new_prediction_df = pd.DataFrame({
-        'Actual Values': actual_values,
-        'Predictions': predictions
-    }).replace([np.inf, -np.inf], np.nan).dropna()
-
-    actual_values =  new_prediction_df['Actual Values']
-    predicted_probabilities =  new_prediction_df['Predictions']
-
-    auc_roc = roc_auc_score(actual_values, predicted_probabilities)
-    fpr, tpr, thresholds = roc_curve(actual_values, predicted_probabilities)
-
-    plt.figure(figsize=(8, 8))
-    plt.plot(fpr, tpr, color='darkorange', lw=2, label='Test ROC curve (area = {:.2f})'.format(auc_roc))
-    if out_of_sample_predictions:
-      new_prediction_df = pd.DataFrame({
-          'Actual Values': out_of_sample_truth,
-          'Predictions': out_of_sample_predictions
-      }).replace([np.inf, -np.inf], np.nan).dropna()
-      actual_values =  new_prediction_df['Actual Values']
-      predicted_probabilities =  new_prediction_df['Predictions']
-      auc_roc = roc_auc_score(actual_values, predicted_probabilities)
-      fpr, tpr, thresholds = roc_curve(actual_values, predicted_probabilities)
-      plt.plot(fpr, tpr, color='green', lw=2, label='Val ROC curve (area = {:.2f})'.format(auc_roc))
-    plt.plot([0, 1], [0, 1], lw=2)
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver Operating Characteristic')
-    plt.legend()
-
 def trial_preprocessor(df, preproc_params={'offset': 5}, new=True):
     df['stmt_date'] = pd.to_datetime(df['stmt_date'], format='%Y-%m-%d')
     df['def_date'] = pd.to_datetime(df['def_date'], format='%d/%m/%Y')

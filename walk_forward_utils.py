@@ -1,4 +1,4 @@
-from utils import stratified_split, predict_harness, plot_auc_rocs, get_roc, plot_roc_distribution
+from utils import stratified_split, predict_harness, get_roc, plot_roc_distribution
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
@@ -67,3 +67,11 @@ def bootstrapped_walk_forward_harness(df, preprocessor_function, train_function,
 
     model = train_function(df)
     return model, test_stats_list, out_of_sample_stats_list, preproc_params
+
+
+"""
+1. Out of sample size - average percentage of new companies per year
+2. Bootstrap Train or Test
+3. ?
+"""
+
