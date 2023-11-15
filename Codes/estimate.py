@@ -42,20 +42,35 @@ def estimation(df_train, model_type=None, seed = 42):
             return clf
         
         case 'XGboost':
-            y_train = df_train['Default']
-            X_train = df_train
+            df_train = df_train.sort_values(by='stmt_date')
             
+            cutoff = int(len(df_train) * 0.8)
+            y = df_train['Default']
+            y_train = y.iloc[:cutoff]
+            y_val = y.iloc[cutoff:]
+   
             # Remove statement datetime column(s) from walk forward calls 
-            X_train = remove_date_features(X_train)
-            X_train = X_train.drop('Default', axis=1)
+            train = remove_date_features(df_train)
+            train = train.drop('Default', axis=1)
+            X_train = train[:cutoff]
+            X_val = train[cutoff:]
+
 
             clf = xgb.XGBClassifier(
-                objective='binary:logistic', 
-                grow_policy='depthwise',
-                seed=seed
+                objective='binary:logistic',
+                learning_rate=0.2,
+                n_estimators=1000,
+                grow_policy='lossguide',
                 )
             
-            clf.fit(X_train, y_train)
+            fit_params = {
+                "early_stopping_rounds": 10, 
+                "eval_set": [(X_val, y_val)],
+                "eval_metric": "auc"
+            }
+
+            clf.fit(X_train, y_train, **fit_params)
+            
             return clf
 
         case _:
