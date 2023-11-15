@@ -3,6 +3,15 @@ import numpy as np
 from scipy.sparse import issparse
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
+from pandas.api.types import is_datetime64_any_dtype
+
+def remove_date_features(df):
+    '''
+        Remove datetime fields from walkforward analysis. 
+        Datetime fields need to be removed before training tree based models
+    '''
+    keep = [x for x in df.columns if not is_datetime64_any_dtype(df[x])]
+    return df[keep]
 
 def default_check(row, date_range):
     '''
@@ -247,7 +256,7 @@ def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=T
             "features": (list of strings) features to retain in the processed dataframe
             "categorical_mapping_path": (dictionary) this dictionary maps the categorical variables to 
                 the csv path storing the translation between categorical variables and integer codes
-        label: Boolean, True if add class labels
+        label: Boolean, if True, add class labels
         interest_rates: Boolean, if True merge historical ECB interest rate data into df
     Returns:
         Processed dataframe for model training/inference

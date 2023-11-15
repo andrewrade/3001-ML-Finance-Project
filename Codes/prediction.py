@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, roc_auc_score
-from pandas.api.types import is_datetime64_any_dtype
+from preprocessor import remove_date_features
 
 def predict_function(df, model=None, model_type='Logit'):
     '''
@@ -17,7 +17,8 @@ def predict_function(df, model=None, model_type='Logit'):
         
         case 'Random_Forest':
             # Remove datetime columns and default column from walk forward calls
-            feats_filtered = [x for x in df.columns if not is_datetime64_any_dtype(df[x]) and x != 'Default']
+            feats_filtered = remove_date_features(df)
+            feats_filtered = feats_filtered.drop('Default', axis=1)
             
             # Skip rows where any featuers are nan, predict_proba method cannot handle nans
             nan_mask = df.isna().any(axis=1).to_numpy() # If any single feature is nan, set the records PD to nan 
@@ -32,7 +33,9 @@ def predict_function(df, model=None, model_type='Logit'):
         
         case 'XGboost':
             # Remove datetime columns and default column from walk forward calls
-            feats_filtered = [x for x in df.columns if not is_datetime64_any_dtype(df[x]) and x != 'Default']
+            feats_filtered = remove_date_features(df)
+            feats_filtered = feats_filtered.drop('Default', axis=1)
+            
             X_train = df[feats_filtered]
             predictions = model.predict_proba(X_train)
 
@@ -77,6 +80,5 @@ def predict_harness(df, model, model_type, plot_auc=True):
     ###############################################################
     # TO DO: CALIBRATE PREDICTIONS USING METHODS IN OPTIMIZATION.PY
     ###############################################################
-
 
     return predictions
