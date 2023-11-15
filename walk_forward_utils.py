@@ -3,67 +3,6 @@ from tqdm import tqdm
 import pandas as pd
 import numpy as np
 
-def walk_forward_harness(df, preprocessor_function, train_function, predictor_function, start_index, step_size=1):
-    df, preproc_params = preprocessor_function(df)
-
-    label='Default'
-    step_col='stmt_date'
-    start_index = pd.to_datetime(start_index)
-    df[step_col] = pd.to_datetime(df[step_col])
-
-    steps = [start_index]
-    step = start_index+pd.DateOffset(years= 1)
-    while step<df[step_col].max():
-        steps.append(step)
-        step = step+pd.DateOffset(years= 1)
-    n = len(steps)
-
-    test_stats_list = []
-    test_truth = []
-    test_predictions = []
-    out_of_sample_stats_list = []
-    out_of_sample_truth = []
-    out_of_sample_predictions = []
-
-    train_df, validation_df = stratified_split(df, label)
-
-    for k, step in enumerate(tqdm(steps)):
-        
-        train = train_df[train_df[step_col] <= step]
-
-        test = train_df[train_df[step_col] >= step]
-        test = test[test[step_col] < step+pd.DateOffset(years= 1)]
-
-        val = validation_df
-        if k>0:
-            val = validation_df[validation_df[step_col] >= step]
-        if k<n-1:
-            val = val[val[step_col] < step+pd.DateOffset(years= 1)]
-        
-        model = train_function(train)
-
-        if test.shape[0]>0:
-            actual_values, predictions, stats = predict_harness(test, model, predictor_function)
-            test_stats_list.append(stats)
-            test_truth += list(actual_values)
-            test_predictions += list(predictions)
-        else:
-            print(k,n)
-
-        if val.shape[0]>0:
-            actual_values, predictions, stats = predict_harness(val, model, predictor_function)
-            out_of_sample_stats_list.append(stats)
-            out_of_sample_truth += list(actual_values)
-            out_of_sample_predictions += list(predictions)
-        else:
-            print(k,n)
-    
-    plot_auc_rocs(test_truth, test_predictions, out_of_sample_truth, out_of_sample_predictions)
-
-    model = train_function(df)
-    return model, test_stats_list, out_of_sample_stats_list, preproc_params
-
-
 def bootstrapped_walk_forward_harness(df, preprocessor_function, train_function, predictor_function, start_index, step_size=1, num_bootstrap_samples = 1000):
     df, preproc_params = preprocessor_function(df)
 
@@ -89,12 +28,12 @@ def bootstrapped_walk_forward_harness(df, preprocessor_function, train_function,
 
     np.random.seed(42)
 
-    for _ in tqdm(range(num_bootstrap_samples)):
+    for i in tqdm(range(num_bootstrap_samples)):
         test_truth = []
         test_predictions = []
         out_of_sample_truth = []
         out_of_sample_predictions = []
-        random_state = np.random.randint(1, 1000)
+        random_state = i+1 # np.random.randint(1, 1000)
 
         bootstrap_data = bootstrap_sample(df, random_state=random_state)
 
@@ -102,7 +41,7 @@ def bootstrapped_walk_forward_harness(df, preprocessor_function, train_function,
             train = bootstrap_data[bootstrap_data[step_col] <= step]
             test = bootstrap_data[(bootstrap_data[step_col] >= step) & (bootstrap_data[step_col] < step + pd.DateOffset(years=1))]
             train, out_of_sample = stratified_split(train, label) 
-
+            train.drop(columns=['id', 'stmt_date'], inplace=True)
             model = train_function(train)
 
             if test.shape[0]>0:
