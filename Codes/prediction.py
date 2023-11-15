@@ -36,7 +36,7 @@ def predict_function(df, model=None, model_type='Logit'):
             feats_filtered = remove_date_features(df)
             feats_filtered = feats_filtered.drop('Default', axis=1)
             
-            X_train = df[feats_filtered]
+            X_train = df[feats_filtered.columns]
             predictions = model.predict_proba(X_train)
 
             return(predictions[:, 1])
