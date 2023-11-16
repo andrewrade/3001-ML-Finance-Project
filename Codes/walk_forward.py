@@ -2,7 +2,7 @@ from utils import stratified_split, get_roc, plot_roc_distribution
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
-import estimate
+from estimate import estimation
 from prediction import predict_harness
 
 def bootstrapped_walk_forward_harness(df, preprocessor_function, preproc_params, train_function, start_index, step_size=1, num_bootstrap_samples = 10, model_type='Logit'):
@@ -47,12 +47,18 @@ def bootstrapped_walk_forward_harness(df, preprocessor_function, preproc_params,
             train = bootstrap_data[bootstrap_data[step_col] <= step]
             test = bootstrap_data[(bootstrap_data[step_col] >= step) & (bootstrap_data[step_col] < step + pd.DateOffset(years=1))]
             train, out_of_sample = stratified_split(train, label) 
-            train.drop(columns=['id', 'stmt_date'], inplace=True)
+            
+            df_train = train.copy()
+            df_train.drop(columns='id', inplace=True)
 
-            model = train_function(df_train = train, model_type = model_type)
+            model = train_function(df_train = df_train, model_type = model_type)
 
             if test.shape[0]>0:
-                actual_values, predictions, stats = predict_harness(test, model, model_type)
+                
+                df_test = test.copy()
+                df_test.drop('id', axis=1, inplace=True)
+                
+                actual_values, predictions, stats = predict_harness(df_test, model, model_type)
                 print(stats)
                 test_stats_list.append(stats)
                 test_truth += list(actual_values)
@@ -70,7 +76,7 @@ def bootstrapped_walk_forward_harness(df, preprocessor_function, preproc_params,
         
         test_roc_values.append(get_roc(test_truth, test_predictions))
         # out_of_sample_roc_values.append(get_roc(out_of_sample_truth, out_of_sample_predictions))
-    plot_roc_distribution(test_roc_values)
+    plot_roc_distribution(test_roc_values, model_type)
     # plot_roc_distribution(out_of_sample_roc_values)
 
     model = train_function(df_train = df, model_type = model_type)
