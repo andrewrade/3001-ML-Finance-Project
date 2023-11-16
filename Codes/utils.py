@@ -15,7 +15,7 @@ def stratified_split(df, label):
 
     return df[df.id.isin(in_sample_companies)], df[df.id.isin(out_of_sample_companies)]
 
-def plot_roc_distribution(roc_values):
+def plot_roc_distribution(roc_values, model_name):
     auc_values = [roc_value[2] for roc_value in roc_values]
     auc = sum(auc_values)/len(auc_values)
     plt.figure(figsize=(8, 8))
@@ -29,7 +29,7 @@ def plot_roc_distribution(roc_values):
     plt.ylabel('True Positive Rate')
     plt.title('Receiver Operating Characteristic, Average AUC = {:.2f})'.format(auc))
     plt.legend()
-    plt.savefig('roc_distribution.png', format='png')
+    plt.savefig(f'figs/{model_name}_roc_distribution.png', format='png')
 
 def get_roc(actual_values, predictions):
     new_prediction_df = pd.DataFrame({
