@@ -42,6 +42,7 @@ def estimation(df_train, model_type=None, seed = 42):
             return clf
         
         case 'XGboost':
+            
             df_train = df_train.sort_values(by='stmt_date')
             
             cutoff = int(len(df_train) * 0.8)
@@ -60,16 +61,11 @@ def estimation(df_train, model_type=None, seed = 42):
                 objective='binary:logistic',
                 learning_rate=0.2,
                 n_estimators=1000,
-                grow_policy='lossguide',
-                )
+                colsample_bytree=0.8
+            )
             
-            fit_params = {
-                "early_stopping_rounds": 10, 
-                "eval_set": [(X_val, y_val)],
-                "eval_metric": "auc"
-            }
-
-            clf.fit(X_train, y_train, **fit_params)
+            clf.set_params(early_stopping_rounds=10, eval_metric="auc")
+            clf.fit(X_train, y_train, eval_set=[(X_val, y_val)])
             
             return clf
 
