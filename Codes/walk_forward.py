@@ -78,6 +78,9 @@ def bootstrapped_walk_forward_harness(df, preprocessor_function, preproc_params,
         # out_of_sample_roc_values.append(get_roc(out_of_sample_truth, out_of_sample_predictions))
     plot_roc_distribution(test_roc_values, model_type)
     # plot_roc_distribution(out_of_sample_roc_values)
+    
 
-    model = train_function(df_train = df, model_type = model_type)
+    # Drop id from full df before passing to train
+    model = train_function(df_train = df.drop(columns='id', inplace=True), model_type = model_type)
+    
     return model, test_stats_list, out_of_sample_stats_list
