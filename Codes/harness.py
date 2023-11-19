@@ -18,6 +18,34 @@ def extract_encoded_feature_names(features):
     
     return list(unencoded_features)
 
+def load_model(model_type):
+    '''
+    Loads model and preprocessing parameters 
+    based on passed model type
+    '''
+    match model_type:
+        
+        case 'XGboost':
+            model_file = 'models/xgb_model.sav'
+            model = joblib.load(model_file)
+            encoded_features = model.feature_names_in_
+            features = extract_encoded_feature_names(encoded_features)
+            one_hot_encode = True
+
+        case 'Logit':
+            model_file = 'models/basic_model.sav'
+            model = joblib.load(model_file)
+            features = model.params.index
+            one_hot_encode = False
+            
+        case 'Random_Forest':
+            model_file = 'models/rf_model.sav'
+            model = joblib.load(model_file)
+            features = model.feature_names_in_
+            one_hot_encode = False
+    
+    return model, features, one_hot_encode
+
 def main():
 
     parser = argparse.ArgumentParser()
@@ -37,27 +65,7 @@ def main():
     '''
     model_type='XGboost' # <<<<<< Change Model here 
 
-    match model_type:
-        
-        case 'XGboost':
-            model_file = 'models/xgb_model.sav'
-            model = joblib.load(model_file)
-            encoded_features = model.feature_names_in_
-            features = extract_encoded_feature_names(encoded_features)
-            one_hot_encode = True
-
-        case 'Logit':
-            model_file = 'models/basic_model.sav'
-            model = joblib.load(model_file)
-            features = model.params.index
-            one_hot_encode = False
-        
-        case 'Random_Forest':
-            model_file = 'models/rf_model.sav'
-            model = joblib.load(model_file)
-            features = model.feature_names_in_
-            one_hot_encode = False
-
+    model, features, one_hot_encode = load_model(model_type)
     preproc_params = {
         "statement_offset" : 6,
         "ir_path": "csv_files/ECB Data Portal_20231029154614.csv",
@@ -68,15 +76,12 @@ def main():
         }
     }
 
-    print(features)
-    test = pd.read_csv(input_file).drop('def_date', axis=1)
-    test = preprocessing_func(test, preproc_params, label=False, interest_rates=True, 
-                            one_hot_encode=one_hot_encode) # When selecting XGboost need to set `one_hot_encode` to True
-    predictions = predict_harness(test, model, model_type, plot_auc=False)
+    test_raw = pd.read_csv(input_file).drop('def_date', axis=1)
+    test_processed = preprocessing_func(test_raw, preproc_params, label=False, interest_rates=True, 
+                                        one_hot_encode=one_hot_encode) # When selecting XGboost need to set `one_hot_encode` to True
+    predictions = predict_harness(test_processed, model, model_type, plot_auc=False)
 
-    pd.DataFrame({
-                "PD":list(predictions)
-                }).to_csv(output_file, index=False)
+    pd.DataFrame({"PD":list(predictions)}).to_csv(output_file, index=False)
 
 
 if __name__ == '__main__':

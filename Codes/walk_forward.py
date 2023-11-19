@@ -66,21 +66,14 @@ def bootstrapped_walk_forward_harness(df, preprocessor_function, preproc_params,
             else:
                 print(k,n)
             
-            # if out_of_sample.shape[0]>0:
-            #     actual_values, predictions, stats = predict_harness(out_of_sample, model, predictor_function)
-            #     out_of_sample_stats_list.append(stats)
-            #     out_of_sample_truth += list(actual_values)
-            #     out_of_sample_predictions += list(predictions)
-            # else:
-            #     print(k,n)
-        
         test_roc_values.append(get_roc(test_truth, test_predictions))
-        # out_of_sample_roc_values.append(get_roc(out_of_sample_truth, out_of_sample_predictions))
+        
     plot_roc_distribution(test_roc_values, model_type)
-    # plot_roc_distribution(out_of_sample_roc_values)
+    
     
 
     # Drop id from full df before passing to train
-    model = train_function(df_train = df.drop(columns='id', inplace=True), model_type = model_type)
+    df.drop(columns='id', inplace=True)
+    model = train_function(df_train = df, model_type = model_type)
     
     return model, test_stats_list, out_of_sample_stats_list
