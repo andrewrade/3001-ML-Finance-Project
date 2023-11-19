@@ -61,10 +61,11 @@ def estimation(df_train, model_type=None, seed = 42):
                 objective='binary:logistic',
                 learning_rate=0.2,
                 n_estimators=1000,
-                colsample_bytree=0.8
+                tree_method='gpu_hist',
+                col_subsample=0.8
             )
             
-            clf.set_params(early_stopping_rounds=10, eval_metric="auc")
+            clf.set_params(early_stopping_rounds=25, eval_metric="auc")
             clf.fit(X_train, y_train, eval_set=[(X_val, y_val)])
             
             return clf
