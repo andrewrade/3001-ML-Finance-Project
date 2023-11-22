@@ -61,7 +61,7 @@ def estimation(df_train, model_type=None, seed = 42):
                 objective='binary:logistic',
                 learning_rate=0.1,
                 n_estimators=1000,
-                col_subsample=0.8
+                colsample_bytree=0.8
             )
             
             clf.set_params(early_stopping_rounds=25, eval_metric="auc")
