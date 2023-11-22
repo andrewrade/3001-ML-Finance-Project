@@ -1,4 +1,4 @@
-from utils import stratified_split, get_roc, plot_roc_distribution
+from utils import stratified_split, get_roc, plot_roc_distribution, train_test_split_by_year
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
@@ -61,7 +61,10 @@ def bootstrapped_walk_forward_harness(df, preprocessor_function, preproc_params,
     plot_roc_distribution(test_roc_values, model_type)
 
     # Drop id from full df before passing to train
-    df.drop(columns='id', inplace=True)
-    model = train_function(df_train = df, model_type = model_type)
+    train, test = train_test_split_by_year(df)
+    pd.DataFrame({"PD":list(test)}).to_csv("csv_files/test.csv", index=False) # Save train data
+    
+    train.drop(columns='id', inplace=True)
+    model = train_function(df_train = train, model_type = model_type)
     
     return model, test_stats_list, None
