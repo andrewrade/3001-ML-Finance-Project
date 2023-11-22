@@ -29,7 +29,6 @@ def load_model(model_type):
             model_file = 'models/xgb_model.sav'
             model = joblib.load(model_file)
             encoded_features = model.feature_names_in_
-            print(encoded_features)
             features = extract_encoded_feature_names(encoded_features)
             one_hot_encode = True
 
@@ -67,15 +66,15 @@ def main():
     model_type='XGboost' # <<<<<< Change Model here 
 
     model, features, one_hot_encode = load_model(model_type)
-    print(features)
     preproc_params = {
         "statement_offset" : 6,
         "ir_path": "csv_files/ECB Data Portal_20231029154614.csv",
         "features": features,
-        "categorical_mapping_path":{
-            'ateco_industry': 'csv_files/ateco_industry_mapping.csv',
-            'legal_struct': 'csv_files/legal_struct_mapping.csv'
-        }
+        "categorical_mapping_path":     {
+                'ateco_industry': 'csv_files/ateco_industry_mapping.csv',
+                'ateco_sector': 'csv_files/ateco_sector_mapping.csv',
+                'legal_struct': 'csv_files/legal_struct_mapping.csv'
+            }
     }
 
     test_raw = pd.read_csv(input_file).drop('def_date', axis=1)
