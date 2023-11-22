@@ -9,6 +9,7 @@ from estimate import estimation
 from prediction import predict_function
 from walk_forward import bootstrapped_walk_forward_harness
 
+
 preproc_params = {
         "statement_offset" : 6,
         "ir_path": "csv_files/ECB Data Portal_20231029154614.csv",
@@ -25,9 +26,10 @@ preproc_params = {
             'interest_rate',  
             'stmt_date', 
             'id'] ,
-        "categorical_mapping_path": {
+        "categorical_mapping_path":     {
                 'ateco_industry': 'csv_files/ateco_industry_mapping.csv',
-                'legal_struct': 'csv_files/ateco_industry_mapping.csv'
+                'ateco_sector': 'csv_files/ateco_sector_mapping.csv',
+                'legal_struct': 'csv_files/legal_struct_mapping.csv'
             }
     }
 

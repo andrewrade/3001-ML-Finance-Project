@@ -179,11 +179,17 @@ def categorical_to_csv(df):
     # Consolidate ateco sectors into industry groups
     df = consolidate_ateco_codes(df)
     df['ateco_industry'] = pd.Categorical(df['ateco_industry'])
+    df['ateco_sector'] = pd.Categorical(df['ateco_sector'])
     df['legal_struct'] = pd.Categorical(df['legal_struct'])
 
     ateco_industry_mapping = pd.DataFrame({
             'Original_Value': df['ateco_industry'],
             'Code': df['ateco_industry'].cat.codes
+    })
+
+    ateco_sector_mapping = pd.DataFrame({
+            'Original_Value': df['ateco_sector'],
+            'Code': df['ateco_sector'].cat.codes
     })
 
     legal_struct_mapping = pd.DataFrame({
@@ -192,13 +198,15 @@ def categorical_to_csv(df):
     })
 
     ateco_industry_mapping = ateco_industry_mapping.drop_duplicates()
+    ateco_sector_mapping = ateco_sector_mapping.drop_duplicates()
     legal_struct_mapping = legal_struct_mapping.drop_duplicates()
 
     # Save the mappings to CSV
     legal_struct_mapping.to_csv('csv_files/legal_struct_mapping.csv', index=False)
     ateco_industry_mapping.to_csv('csv_files/ateco_industry_mapping.csv', index=False)
+    ateco_sector_mapping.to_csv('csv_files/ateco_sector_mapping.csv', index=False)
     
-    return legal_struct_mapping, ateco_industry_mapping
+    return legal_struct_mapping, ateco_industry_mapping, ateco_sector_mapping
 
 def create_encoders_from_csv(mappings):
     '''
@@ -266,9 +274,10 @@ def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=T
             preproc_params = {
         "statement_offset" : 6,
         "ir_path": "csv_files/ECB Data Portal_20231029154614.csv",
-        "features": ['asset_turnover', 'leverage_ratio', 'roa','interest_rate', 'ateco_industry','AR'],
+        "features": ['legal_struct', 'asset_turnover', 'roa', 'debt_to_ebitda', 'interest_rate', 'leverage_ratio', 'defensive_interval', 'cfo_to_debt', 'ateco_industry', 'debt_to_equity'],
         "categorical_mapping_path":     {
                 'ateco_industry': 'csv_files/ateco_industry_mapping.csv',
+                'ateco_sector': 'csv_files/ateco_sector_mapping.csv',
                 'legal_struct': 'csv_files/legal_struct_mapping.csv'
             }
     }
@@ -304,8 +313,9 @@ def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=T
         try: 
             legal_struct_mapping = pd.read_csv(preproc_params['categorical_mapping_path']['legal_struct'])
             ateco_industry_mapping = pd.read_csv(preproc_params['categorical_mapping_path']['ateco_industry'])
+            ateco_sector_mapping = pd.read_csv(preproc_params['categorical_mapping_path']['ateco_sector'])
         except:
-            legal_struct_mapping, ateco_industry_mapping = categorical_to_csv(df)
+            legal_struct_mapping, ateco_industry_mapping, ateco_sector_mapping = categorical_to_csv(df)
        
         if one_hot_encode: # One hot encode for XGboost
             processed_df = one_hot_encoder(processed_df, preproc_params, categorical_features)
@@ -320,11 +330,16 @@ def preprocessing_func(raw_df, preproc_params=None, label=True, interest_rates=T
                 processed_df['legal_struct'] = processed_df['legal_struct'].\
                     map(dict(zip(legal_struct_mapping['Original_Value'], legal_struct_mapping['Code'])))
             
-            # Map and encode 'ateco_sector'
+            # Map and encode 'ateco_industry'
             if 'ateco_industry' in preproc_params['features']:
                 processed_df['ateco_industry'] = processed_df['ateco_industry'].\
                     map(dict(zip(ateco_industry_mapping['Original_Value'], ateco_industry_mapping['Code'])))
-    
+                
+            # Map and encode 'ateco_sector'
+            if 'ateco_sector' in preproc_params['features']:
+                processed_df['ateco_sector'] = processed_df['ateco_sector'].\
+                    map(dict(zip(ateco_sector_mapping['Original_Value'], ateco_sector_mapping['Code'])))
+
     return processed_df
     
 

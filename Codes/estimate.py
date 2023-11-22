@@ -59,9 +59,8 @@ def estimation(df_train, model_type=None, seed = 42):
 
             clf = xgb.XGBClassifier(
                 objective='binary:logistic',
-                learning_rate=0.2,
+                learning_rate=0.1,
                 n_estimators=1000,
-                tree_method='gpu_hist',
                 col_subsample=0.8
             )
             

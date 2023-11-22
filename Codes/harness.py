@@ -29,6 +29,7 @@ def load_model(model_type):
             model_file = 'models/xgb_model.sav'
             model = joblib.load(model_file)
             encoded_features = model.feature_names_in_
+            print(encoded_features)
             features = extract_encoded_feature_names(encoded_features)
             one_hot_encode = True
 
@@ -66,6 +67,7 @@ def main():
     model_type='XGboost' # <<<<<< Change Model here 
 
     model, features, one_hot_encode = load_model(model_type)
+    print(features)
     preproc_params = {
         "statement_offset" : 6,
         "ir_path": "csv_files/ECB Data Portal_20231029154614.csv",
@@ -79,6 +81,7 @@ def main():
     test_raw = pd.read_csv(input_file).drop('def_date', axis=1)
     test_processed = preprocessing_func(test_raw, preproc_params, label=False, interest_rates=True, 
                                         one_hot_encode=one_hot_encode) # When selecting XGboost need to set `one_hot_encode` to True
+    print(test_processed.columns)
     predictions = predict_harness(test_processed, model, model_type, plot_auc=False)
 
     pd.DataFrame({"PD":list(predictions)}).to_csv(output_file, index=False)
