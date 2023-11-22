@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-def train_test_split_by_year(df, date_column='stmt_date'):
+def train_test_split_by_year(df, date_column, test_frac):
     """
     Split passed df into train and test sets. Test is comprised of 
-    50% of the samples from the last year of data in test set.
+    test_frac % of the samples from the last year of data in test set.
     """
     df['year'] = df[date_column].dt.year # Extract year from 'stmt_date'
     last_year = df['year'].max()
@@ -15,7 +15,7 @@ def train_test_split_by_year(df, date_column='stmt_date'):
     prev_years_train = df[df['year'] < last_year]
     
     # Split the last year's data into 50% test and 50% train
-    last_year_train, test = train_test_split(last_year_data, test_size=0.5, random_state=42)
+    last_year_train, test = train_test_split(last_year_data, test_size=test_frac, random_state=42)
     
     # Combine the previous years' data with the last year's training data
     train = pd.concat([prev_years_train, last_year_train])
