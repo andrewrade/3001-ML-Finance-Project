@@ -4,6 +4,27 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
+def train_test_split_by_year(df, date_column='stmt_date'):
+    """
+    Split passed df into train and test sets. Test is comprised of 
+    50% of the samples from the last year of data in test set.
+    """
+    df['year'] = df[date_column].dt.year # Extract year from 'stmt_date'
+    last_year = df['year'].max()
+    last_year_data = df[df['year'] == last_year]  # Separate out last year of data
+    prev_years_train = df[df['year'] < last_year]
+    
+    # Split the last year's data into 50% test and 50% train
+    last_year_train, test = train_test_split(last_year_data, test_size=0.5, random_state=42)
+    
+    # Combine the previous years' data with the last year's training data
+    train = pd.concat([prev_years_train, last_year_train])
+    
+    train = train.drop(columns=['year'])
+    test = test.drop(columns=['year'])
+    
+    return train, test
+
 def stratified_split(df, label):
     grouped_df = df.groupby('id').agg({'id': 'count', label: 'max'})
     grouped_df = grouped_df.rename(columns={'id': 'count', label: 'default_max'})
