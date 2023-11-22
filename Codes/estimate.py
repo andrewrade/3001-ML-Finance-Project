@@ -3,6 +3,7 @@ import statsmodels.api as sm
 from sklearn.ensemble import RandomForestClassifier
 import xgboost as xgb
 from preprocessor import remove_date_features
+from utils import train_test_split_by_year
 
 def estimation(df_train, model_type=None, seed = 42):
     '''
@@ -42,24 +43,22 @@ def estimation(df_train, model_type=None, seed = 42):
             return clf
         
         case 'XGboost':
-            
-            df_train = df_train.sort_values(by='stmt_date')
-            
-            cutoff = int(len(df_train) * 0.8)
-            y = df_train['Default']
-            y_train = y.iloc[:cutoff]
-            y_val = y.iloc[cutoff:]
-   
-            # Remove statement datetime column(s) from walk forward calls 
-            train = remove_date_features(df_train)
-            train = train.drop('Default', axis=1)
-            X_train = train[:cutoff]
-            X_val = train[cutoff:]
+            # Take val as 20% of most recent year in data (prevent growing validation set size)
+            train, val = train_test_split_by_year(df_train, date_column='stmt_date', test_frac=0.2)
 
+            # Remove statement datetime column(s) from walk forward calls 
+            train = remove_date_features(train)
+            val = remove_date_features(val)
+
+            y_train = train['Default']
+            y_val = val['Default']
+   
+            X_train = train.drop('Default', axis=1)
+            X_val = val.drop('Default', axis=1)
 
             clf = xgb.XGBClassifier(
                 objective='binary:logistic',
-                learning_rate=0.1,
+                learning_rate=0.2,
                 n_estimators=1000,
                 colsample_bytree=0.8
             )
