@@ -23,45 +23,57 @@ def bootstrapped_walk_forward_harness(df, preprocessor_function, preproc_params,
     steps = steps[2:]
     print(steps)
 
-    test_truth = [[] for _ in range(num_bootstrap_samples)]
-    test_predictions = [[] for _ in range(num_bootstrap_samples)]
-    test_stats_list = [[] for _ in range(num_bootstrap_samples)]
+    test_stats_list = []
+    out_of_sample_stats_list = []
     test_roc_values = []
-    
+    # out_of_sample_roc_values = []
+
+    def bootstrap_sample(data, random_state):
+        return data.sample(n=data.shape[0], replace=True, random_state=random_state, ignore_index=True)
+
     np.random.seed(42)
 
-    for k, step in enumerate(tqdm(steps)):    
-        train = df[df[step_col] <= step]
-        test = df[(df[step_col] >= step) & (df[step_col] < step + pd.DateOffset(years=1))]
+    for i in tqdm(range(num_bootstrap_samples)):
         
-        df_train = train.copy()
-        df_train.drop(columns='id', inplace=True)
+        test_truth = []
+        test_predictions = []
+        out_of_sample_truth = []
+        out_of_sample_predictions = []
+        random_state = i+1
 
-        model = train_function(df_train = df_train, model_type = model_type)
+        bootstrap_data = bootstrap_sample(df, random_state=random_state)
 
-        if test.shape[0]>0:
+        for k, step in enumerate(steps):    
+            train = bootstrap_data[bootstrap_data[step_col] <= step]
+            test = bootstrap_data[(bootstrap_data[step_col] >= step) & (bootstrap_data[step_col] < step + pd.DateOffset(years=1))]
+            train, out_of_sample = stratified_split(train, label) 
+            
+            df_train = train.copy()
+            df_train.drop(columns='id', inplace=True)
 
-            for i in range(num_bootstrap_samples):
+            model = train_function(df_train = df_train, model_type = model_type)
 
-                bootstrap_test = test.sample(n=test.shape[0], replace=True, random_state=i+1, ignore_index=True)
-                bootstrap_test.drop('id', axis=1, inplace=True)
+            if test.shape[0]>0:
                 
-                actual_values, predictions, stats = predict_harness(bootstrap_test, model, model_type)
+                df_test = test.copy()
+                df_test.drop('id', axis=1, inplace=True)
+                
+                actual_values, predictions, stats = predict_harness(df_test, model, model_type)
                 print(stats)
-                test_stats_list[i].append(stats)
-                test_truth[i] += list(actual_values)
-                test_predictions[i] += list(predictions)
-
-        else:
-            print(k,n)
-
-    for i in range(num_bootstrap_samples):
-        test_roc_values.append(get_roc(test_truth[i], test_predictions[i]))
+                test_stats_list.append(stats)
+                test_truth += list(actual_values)
+                test_predictions += list(predictions)
+            else:
+                print(k,n)
+            
+        test_roc_values.append(get_roc(test_truth, test_predictions))
         
     plot_roc_distribution(test_roc_values, model_type)
+    
+    
 
     # Drop id from full df before passing to train
     df.drop(columns='id', inplace=True)
     model = train_function(df_train = df, model_type = model_type)
     
-    return model, test_stats_list, None
+    return model, test_stats_list, out_of_sample_stats_list
