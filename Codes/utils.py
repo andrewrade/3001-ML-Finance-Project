@@ -46,7 +46,7 @@ def plot_roc_distribution(roc_values, model_name, auc):
     plt.ylim([0.0, 1.05])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.title('Receiver Operating Characteristic, Average AUC = {:.2f})'.format(auc))
+    plt.title('Receiver Operating Characteristic, AUC = {:.2f})'.format(auc))
     plt.legend()
     plt.savefig(f'figs/{model_name}_roc_distribution.png', format='png')
 
