@@ -36,9 +36,7 @@ def stratified_split(df, label):
 
     return df[df.id.isin(in_sample_companies)], df[df.id.isin(out_of_sample_companies)]
 
-def plot_roc_distribution(roc_values, model_name):
-    auc_values = [roc_value[2] for roc_value in roc_values]
-    auc = sum(auc_values)/len(auc_values)
+def plot_roc_distribution(roc_values, model_name, auc):
     plt.figure(figsize=(8, 8))
 
     for fpr, tpr, _ in roc_values:

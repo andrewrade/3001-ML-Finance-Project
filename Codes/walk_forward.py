@@ -55,10 +55,14 @@ def bootstrapped_walk_forward_harness(df, preprocessor_function, preproc_params,
         else:
             print(k,n)
 
+    truths = []
+    predictions = []
     for i in range(num_bootstrap_samples):
         test_roc_values.append(get_roc(test_truth[i], test_predictions[i]))
-        
-    plot_roc_distribution(test_roc_values, model_type)
+        truths += test_truth[i]
+        predictions += test_predictions[i]
+    _, _, auc = get_roc(truths, predictions)
+    plot_roc_distribution(test_roc_values, model_type, auc)
 
     # Drop id from full df before passing to train
     train, test = train_test_split_by_year(df, date_column='stmt_date', test_frac=0.4)
