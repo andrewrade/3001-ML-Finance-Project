@@ -79,8 +79,11 @@ def merge_interest_rates(df, preproc_params):
     # Add offset to interest rate dates to merge with offset
     interest_rates['offset_date'] = interest_rates['DATE'] + pd.DateOffset(months=preproc_params['statement_offset'])
     # Merge as_of due to imprecision when adding date offset
+    df['monotonic_column'] = range(len(df))
     df = pd.merge_asof(df.sort_values("stmt_date"), interest_rates.sort_values("offset_date"), 
                        left_on='stmt_date', right_on='offset_date', direction='nearest')
+    df = df.sort_values("monotonic_column")
+    df = df.drop('monotonic_column', axis=1)
     return df
 
 def label_defaults(df, preproc_params):
