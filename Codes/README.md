@@ -17,7 +17,7 @@
 #### walkforward.py - returns walk forward stats for AUC
 #### utils.py - includes helper function
 #### Harness.py - code for submission/ prediction on holout dataset
-#### Calibration.py
+#### Calibration.py - code for non-parametric and baseline PD calibration
 
 
 # Files
@@ -25,7 +25,7 @@
 #### atc_industry_mapping - Consolidated sector code mapping for categorical encoding
 #### ateco_sector_mapping - ateco sector code mapping for categorical encoding
 #### legal struct_mapping - legal structure of firm mapping for categorical encoding
-#### ECB Data Portal_20231029154614 - Interest rate data
+#### ECB Data Portal_20231029154614 - ECB historical interest rate data
 
 # Notebook
 
