@@ -4,6 +4,10 @@ from sklearn.ensemble import RandomForestClassifier
 import xgboost as xgb
 from preprocessor import remove_date_features
 from utils import train_test_split_by_year
+from sklearn.calibration import calibration_curve
+from prediction import predict_function
+from calibration import IsotonicCalibrator
+import joblib
 
 def estimation(df_train, model_type=None, seed = 42):
     '''
@@ -65,6 +69,15 @@ def estimation(df_train, model_type=None, seed = 42):
             
             clf.set_params(early_stopping_rounds=25, eval_metric="auc")
             clf.fit(X_train, y_train, eval_set=[(X_val, y_val)])
+
+
+            val["predictions"] = predict_function(X_val, model=model, model_type=model_type)
+            prob_true, prob_pred = calibration_curve(y_val, val["predictions"], n_bins=200)
+            isotonic_calibrator = IsotonicCalibrator(prob_pred, prob_true)
+            val['PD'] = isotonic_calibrator.calibrate(val[["predictions"]])
+
+            calibration_file = 'models/calibrator.sav'
+            joblib.dump(isotonic_calibrator, calibration_file)
             
             return clf
 

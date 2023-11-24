@@ -65,7 +65,7 @@ def bootstrapped_walk_forward_harness(df, preprocessor_function, preproc_params,
     plot_roc_distribution(test_roc_values, model_type, auc)
 
     # Drop id from full df before passing to train
-    train, test = train_test_split_by_year(df, date_column='stmt_date', test_frac=0.4)
+    train, test = train_test_split_by_year(df, date_column='stmt_date', test_frac=0.8)
     test.to_csv("csv_files/test.csv", index=False) # Save train data
     
     train.drop(columns='id', inplace=True)

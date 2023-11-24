@@ -37,8 +37,14 @@ model_type = 'XGboost' # <<<<<<< 'Logit', 'Ranom_Forest' or 'XGboost'
 
 df = pd.read_csv('csv_files/train.csv')
 start_index = df['stmt_date'].min()
-model, test_stats_list, out_of_sample_stats_list =  bootstrapped_walk_forward_harness(df, preprocessor_function 
-= preprocessing_func, preproc_params=preproc_params, train_function = estimation, start_index=start_index, step_size=1, num_bootstrap_samples=100, model_type=model_type)
+model, test_stats_list, out_of_sample_stats_list =  bootstrapped_walk_forward_harness(df,
+                                                                    preprocessor_function = preprocessing_func,
+                                                                    preproc_params=preproc_params,
+                                                                    train_function = estimation,
+                                                                    start_index=start_index,
+                                                                    step_size=1,
+                                                                    num_bootstrap_samples=100,
+                                                                    model_type=model_type)
 
 match model_type:
     case 'XGboost':

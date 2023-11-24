@@ -62,3 +62,43 @@ def get_roc(actual_values, predictions):
     auc = roc_auc_score(actual_values, predicted_probabilities)
     fpr, tpr, thresholds = roc_curve(actual_values, predicted_probabilities)
     return [fpr, tpr, auc]
+
+def get_probability(num, probability_map):
+    return probability_map[num] if num in probability_map else probability_map[min(probability_map.keys(), key=lambda k: abs(k-num))]
+
+def set_probability(df):
+    probability_map = get_bins(df, 'predictions')
+    return df['predictions'].apply(lambda x: get_probability(x, probability_map))
+
+def get_bins(dataset, column):
+    n = 200 #n_of_buckets #optimal_num_bins(dataset[column])
+    dataset[column].fillna(0, inplace=True)
+    # Calculate histogram
+    hist, bin_edges = np.histogram(dataset[column], bins=dataset[column].quantile(np.linspace(0,1,n+1)))
+
+    bins = []
+    percentage = []
+    for i in range(n):
+        bins.append((bin_edges[i]+bin_edges[i+1])/2)
+        mask = (bin_edges[i] <= dataset[column]) & (dataset[column] < bin_edges[i + 1])
+        percentage.append(dataset['Default'][mask].mean())
+    # print(bin_edges)
+    percentage = [0 if pd.isna(x) else x for x in percentage]
+    probability_map = {b:p for b,p in zip(bins, percentage)}
+    return probability_map
+
+def plot_defaults(dataset, column):
+    probability_map = get_bins(dataset, column)
+    bins = []
+    percentage = []
+    for b,p in probability_map.items():
+        bins.append(b)
+        percentage.append(p)
+
+    plt.figure(figsize=(15, 6))
+    plt.bar(bins, percentage, width=0.0002, color='skyblue')
+    plt.xlabel(column)
+    plt.xticks(rotation=45)
+    plt.ylabel('Percentage of Default')
+    plt.title(f'Percentage of Default VS {column}')
+    plt.show()

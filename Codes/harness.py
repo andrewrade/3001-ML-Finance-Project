@@ -46,6 +46,14 @@ def load_model(model_type):
     
     return model, features, one_hot_encode
 
+def load_calibrator():
+    '''
+    Loads the calibrator
+    '''
+    calibrator_file = 'models/calibrator.sav'
+    calibrator = joblib.load(calibrator_file)
+    return calibrator
+
 def main():
 
     parser = argparse.ArgumentParser()
@@ -66,6 +74,7 @@ def main():
     model_type='XGboost' # <<<<<< Change Model here 
 
     model, features, one_hot_encode = load_model(model_type)
+    calibrator = load_calibrator()
     preproc_params = {
         "statement_offset" : 6,
         "ir_path": "csv_files/ECB Data Portal_20231029154614.csv",
@@ -81,7 +90,7 @@ def main():
     test_processed = preprocessing_func(test_raw, preproc_params, label=False, interest_rates=True, 
                                         one_hot_encode=one_hot_encode) # When selecting XGboost need to set `one_hot_encode` to True
     print(test_processed.columns)
-    predictions = predict_harness(test_processed, model, model_type, plot_auc=False)
+    predictions = predict_harness(test_processed, model, model_type, plot_auc=False, calibrator=calibrator)
 
     pd.DataFrame({"PD":list(predictions)}).to_csv(output_file, index=False)
 

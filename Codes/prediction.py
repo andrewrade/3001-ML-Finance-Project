@@ -1,8 +1,11 @@
+import json
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from calibration import bayesian_pd_adjustment
 from sklearn.metrics import roc_curve, roc_auc_score
 from preprocessor import remove_date_features
+
 
 def predict_function(df, model=None, model_type='Logit'):
     '''
@@ -42,7 +45,7 @@ def predict_function(df, model=None, model_type='Logit'):
         case _:
             raise ValueError(f"Invalid model_type: {model_type}. Supported types are 'Logit' and 'Random_Forest'.")
     
-def predict_harness(df, model, model_type, plot_auc=True):
+def predict_harness(df, model, model_type, plot_auc=True, calibrator = None):
     '''
     Prediction harness that produces probabilities of default (PD) using the passed model
     Parameters:
@@ -73,10 +76,23 @@ def predict_harness(df, model, model_type, plot_auc=True):
             auc_roc = roc_auc_score(actual_values, new_predictions)
         except:
             auc_roc = np.nan
-        return df['Default'], predictions, auc_roc
-    
-    ###############################################################
-    # TO DO: CALIBRATE PREDICTIONS USING METHODS IN OPTIMIZATION.PY
-    ###############################################################
 
-    return predictions
+    df['PD'] = predictions
+    if calibrator is not None:
+        df['PD'] = calibrator.calibrate(df[["PD"]])
+
+    try:
+        f = open('bootstrapped_pd_stats.json')
+        bootstrapped_pd_stats = json.load(f)
+        pi_true = bootstrapped_pd_stats['mean']
+        pi_sample = bootstrapped_pd_stats['sample_mean']
+    except:
+        pi_sample = 0.00744047619047619
+        pi_true = 0.012876727318201713
+
+    df['PD'] = df['PD'].apply(lambda x: bayesian_pd_adjustment(x, pi_sample, pi_true))
+
+    if plot_auc:
+        return df['PD'], predictions, auc_roc
+
+    return df['PD']
