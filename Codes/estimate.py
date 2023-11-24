@@ -71,7 +71,7 @@ def estimation(df_train, model_type=None, seed = 42):
             clf.fit(X_train, y_train, eval_set=[(X_val, y_val)])
 
 
-            val["predictions"] = predict_function(X_val, model=model, model_type=model_type)
+            val["predictions"] = predict_function(X_val, model=clf, model_type=model_type)
             prob_true, prob_pred = calibration_curve(y_val, val["predictions"], n_bins=200)
             isotonic_calibrator = IsotonicCalibrator(prob_pred, prob_true)
             val['PD'] = isotonic_calibrator.calibrate(val[["predictions"]])

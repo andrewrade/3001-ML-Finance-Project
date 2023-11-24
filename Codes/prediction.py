@@ -93,6 +93,6 @@ def predict_harness(df, model, model_type, plot_auc=True, calibrator = None):
     df['PD'] = df['PD'].apply(lambda x: bayesian_pd_adjustment(x, pi_sample, pi_true))
 
     if plot_auc:
-        return df['PD'], predictions, auc_roc
+        return df['Default'], list(df['PD']), auc_roc
 
     return df['PD']

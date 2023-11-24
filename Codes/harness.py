@@ -92,7 +92,7 @@ def main():
     print(test_processed.columns)
     predictions = predict_harness(test_processed, model, model_type, plot_auc=False, calibrator=calibrator)
 
-    pd.DataFrame({"PD":list(predictions)}).to_csv(output_file, index=False)
+    pd.DataFrame(predictions).to_csv(output_file, header=False, index=False)
 
 
 if __name__ == '__main__':

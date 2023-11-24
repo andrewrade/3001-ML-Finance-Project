@@ -14,8 +14,8 @@ preproc_params = {
         "statement_offset" : 6,
         "ir_path": "csv_files/ECB Data Portal_20231029154614.csv",
         "features": [
-            'ateco_industry',
-            'legal_struct',
+            #'ateco_industry',
+            #'legal_struct',
             'defensive_interval', 
             'asset_turnover', 
             'debt_to_equity', 
