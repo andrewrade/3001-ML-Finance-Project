@@ -4,40 +4,51 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-def default_check(row, date_range):
-    if pd.isnull(row['def_date']):
-        return 0
-    if row['def_date'] >= date_range[row['stmt_date']][0] and row['def_date'] < date_range[row['stmt_date']][1]:
-        return 1
-    return 0
+def train_test_split_by_year(df, date_column, test_frac):
+    """
+    Split passed df into train and test sets. Test is comprised of 
+    test_frac % of the samples from the last year of data in test set.
+    """
+    df['year'] = df[date_column].dt.year # Extract year from 'stmt_date'
+    last_year = df['year'].max()
+    last_year_data = df[df['year'] == last_year]  # Separate out last year of data
+    prev_years_train = df[df['year'] < last_year]
+    
+    # Split the last year's data into 50% test and 50% train
+    last_year_train, test = train_test_split(last_year_data, test_size=test_frac, random_state=42)
+    
+    # Combine the previous years' data with the last year's training data
+    train = pd.concat([prev_years_train, last_year_train])
+    
+    train = train.drop(columns=['year'])
+    test = test.drop(columns=['year'])
+    
+    return train, test
 
 def stratified_split(df, label):
     grouped_df = df.groupby('id').agg({'id': 'count', label: 'max'})
     grouped_df = grouped_df.rename(columns={'id': 'count', label: 'default_max'})
     grouped_df = grouped_df.reset_index()
 
-    in_sample_companies, out_of_sample_companies = train_test_split(df, test_size=0.3, random_state=42)
+    in_sample_companies, out_of_sample_companies = train_test_split(df, test_size=0.1, random_state=42)
     in_sample_companies = in_sample_companies['id'].values
     out_of_sample_companies = out_of_sample_companies['id'].values
 
     return df[df.id.isin(in_sample_companies)], df[df.id.isin(out_of_sample_companies)]
 
-def predict_harness(test, model, predictor_function):
-    predictions = predictor_function(test, model)
+def plot_roc_distribution(roc_values, model_name, auc):
+    plt.figure(figsize=(8, 8))
 
-    new_prediction_df = pd.DataFrame({
-        'Actual': test['Default'],
-        'Predicted': predictions
-    }).replace([np.inf, -np.inf], np.nan).dropna()
-    actual_values = new_prediction_df['Actual']
-    new_predictions =  new_prediction_df['Predicted']
-
-    try:
-        auc_roc = roc_auc_score(actual_values, new_predictions)
-    except:
-        auc_roc = np.nan
-        
-    return test['Default'], predictions, auc_roc
+    for fpr, tpr, _ in roc_values:
+        plt.plot(fpr, tpr, lw=2)
+    plt.plot([0, 1], [0, 1], lw=2)
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic, AUC = {:.2f})'.format(auc))
+    plt.legend()
+    plt.savefig(f'figs/{model_name}_roc_distribution.png', format='png')
 
 def get_roc(actual_values, predictions):
     new_prediction_df = pd.DataFrame({
@@ -52,51 +63,42 @@ def get_roc(actual_values, predictions):
     fpr, tpr, thresholds = roc_curve(actual_values, predicted_probabilities)
     return [fpr, tpr, auc]
 
-def plot_roc_distribution(roc_values):
-    auc_values = [roc_value[2] for roc_value in roc_values]
-    auc = sum(auc_values)/len(auc_values)
-    plt.figure(figsize=(8, 8))
+def get_probability(num, probability_map):
+    return probability_map[num] if num in probability_map else probability_map[min(probability_map.keys(), key=lambda k: abs(k-num))]
 
-    for fpr, tpr, _ in roc_values:
-        plt.plot(fpr, tpr, lw=2)
-    plt.plot([0, 1], [0, 1], lw=2)
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver Operating Characteristic, Average AUC = {:.2f})'.format(auc))
-    plt.legend()
+def set_probability(df):
+    probability_map = get_bins(df, 'predictions')
+    return df['predictions'].apply(lambda x: get_probability(x, probability_map))
 
-def trial_preprocessor(df, preproc_params={'offset': 5}, new=True):
-    df['stmt_date'] = pd.to_datetime(df['stmt_date'], format='%Y-%m-%d')
-    df['def_date'] = pd.to_datetime(df['def_date'], format='%d/%m/%Y')
-    date_range = dict()
-    for date in df['stmt_date'].unique():
-        date = pd.to_datetime(date)
-        if pd.isnull(date):
-          continue
-        prediction_window_start = date + pd.DateOffset(months = preproc_params['offset'])
-        prediction_window_end = date + pd.DateOffset(years = 1, months = preproc_params['offset'])
-        date_range[date] = (prediction_window_start, prediction_window_end)
-    df['Default'] = df.apply(lambda x: default_check(x, date_range), axis=1)
+def get_bins(dataset, column):
+    n = 200 #n_of_buckets #optimal_num_bins(dataset[column])
+    dataset[column].fillna(0, inplace=True)
+    # Calculate histogram
+    hist, bin_edges = np.histogram(dataset[column], bins=dataset[column].quantile(np.linspace(0,1,n+1)))
 
-    df['A'] = df['wc_net']/df['asst_tot']
-    df['B'] = df['profit']/df['asst_tot']
-    df['C'] = df['ebitda']/df['asst_tot']
-    denominator = df['asst_tot'] - df['eqty_tot']
-    df['D'] = df['eqty_tot'] / denominator.where(denominator != 0, 0.01)
-    df['E'] = df['rev_operating']/df['asst_tot']
+    bins = []
+    percentage = []
+    for i in range(n):
+        bins.append((bin_edges[i]+bin_edges[i+1])/2)
+        mask = (bin_edges[i] <= dataset[column]) & (dataset[column] < bin_edges[i + 1])
+        percentage.append(dataset['Default'][mask].mean())
+    # print(bin_edges)
+    percentage = [0 if pd.isna(x) else x for x in percentage]
+    probability_map = {b:p for b,p in zip(bins, percentage)}
+    return probability_map
 
-    return df, preproc_params
+def plot_defaults(dataset, column):
+    probability_map = get_bins(dataset, column)
+    bins = []
+    percentage = []
+    for b,p in probability_map.items():
+        bins.append(b)
+        percentage.append(p)
 
-def trial_train(df):
-    import statsmodels.formula.api as sm
-
-    f = 'Default ~ A + B + C + D + E'
-    
-    model_ols = sm.ols(f, data=df).fit(disp=0)
-    return(model_ols)
-
-def trial_predict(test_df, model):
-    predictions = model.predict(test_df)
-    return(predictions)
+    plt.figure(figsize=(15, 6))
+    plt.bar(bins, percentage, width=0.0002, color='skyblue')
+    plt.xlabel(column)
+    plt.xticks(rotation=45)
+    plt.ylabel('Percentage of Default')
+    plt.title(f'Percentage of Default VS {column}')
+    plt.show()
